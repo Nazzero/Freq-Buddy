@@ -311,21 +311,78 @@ def check_cancel(mid):
         pass  # if the check itself fails, don't abort the turn
 
 
+def _strip_code_fences(text: str) -> str:
+    """Remove a leading ```json / ``` fence wrapper if the model wrapped its JSON
+    in a markdown code block (common with Claude/Sonnet)."""
+    t = text.strip()
+    m = re.match(r"^```(?:json|JSON)?\s*\n?(.*?)\n?```\s*$", t, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    return t
+
+
+def _find_balanced_json(text: str) -> dict | None:
+    """Scan for the first balanced {...} object, respecting strings/escapes so a
+    '}' inside a JSON string value does not terminate the object early. Returns
+    the parsed dict or None. This is far more robust than a greedy `\\{.*\\}`
+    regex, which over- or under-matches once the reply contains braces/quotes."""
+    start = text.find("{")
+    while start != -1:
+        depth = 0
+        in_str = False
+        esc = False
+        for i in range(start, len(text)):
+            c = text[i]
+            if in_str:
+                if esc:
+                    esc = False
+                elif c == "\\":
+                    esc = True
+                elif c == '"':
+                    in_str = False
+            else:
+                if c == '"':
+                    in_str = True
+                elif c == "{":
+                    depth += 1
+                elif c == "}":
+                    depth -= 1
+                    if depth == 0:
+                        chunk = text[start:i + 1]
+                        try:
+                            obj = json.loads(chunk)
+                            if isinstance(obj, dict):
+                                return obj
+                        except Exception:
+                            pass
+                        break  # this candidate failed; try the next '{'
+        start = text.find("{", start + 1)
+    return None
+
+
 def extract_json(text: str) -> dict:
-    # find the first {...} balanced block
-    m = re.search(r"\{.*\}", text, re.DOTALL)
-    if not m:
-        return {"reply": text.strip()[:300] or "(no reply)", "actions": []}
+    """Pull the brain's {reply, ops, fetch, query, ...} object out of the model's
+    output. Tolerates markdown code fences, prose before/after the JSON, and
+    braces inside string values. If no JSON is present at all, fall back to
+    using the raw text AS the reply (the model answered in prose) rather than
+    surfacing an unhelpful '(brain parse error)'."""
+    text = _strip_code_fences(text)
+    # 1) whole thing is clean JSON
     try:
-        return json.loads(m.group(0))
+        obj = json.loads(text)
+        if isinstance(obj, dict):
+            return obj
     except Exception:
-        # try the largest brace span
-        try:
-            start = text.index("{")
-            end = text.rindex("}") + 1
-            return json.loads(text[start:end])
-        except Exception:
-            return {"reply": "(brain parse error)", "actions": []}
+        pass
+    # 2) first balanced JSON object embedded in the text
+    obj = _find_balanced_json(text)
+    if obj is not None:
+        return obj
+    # 3) no JSON found -> treat the model's prose as the answer, not an error
+    cleaned = text.strip()
+    if cleaned:
+        return {"reply": cleaned, "actions": []}
+    return {"reply": "(no reply)", "actions": []}
 
 
 JCODE_TIMEOUT = 180   # hard cap per model call (s)
