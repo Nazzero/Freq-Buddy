@@ -221,12 +221,12 @@
   .swatch{ width:20px; height:20px; padding:0; border:1px solid var(--border); border-radius:4px; cursor:pointer; flex:0 0 auto; position:relative; }
   .swatch:hover{ border-color:var(--accent, #79c0ff); }
   .arow.hiddenind .swatch{ opacity:.4; }
-  #cpop{ position:fixed; z-index:360; width:208px; background:var(--bg-2); border:1px solid var(--border); border-radius:var(--r-md, 8px); box-shadow:0 16px 50px rgba(0,0,0,.6); padding:10px; display:none; }
+  #cpop{ position:fixed; z-index:360; width:230px; max-width:calc(100vw - 16px); box-sizing:border-box; background:var(--bg-2); border:1px solid var(--border); border-radius:var(--r-md, 8px); box-shadow:0 16px 50px rgba(0,0,0,.6); padding:10px; display:none; }
   #cpop.show{ display:block; }
   #cpop input[type=color]{ width:100%; height:34px; padding:0; border:1px solid var(--border); border-radius:6px; background:none; cursor:pointer; }
   #cpop .srow{ display:flex; align-items:center; gap:6px; font-size:10px; color:var(--text-3); margin-top:9px; }
   #cpop .srow label{ flex:0 0 46px; text-transform:uppercase; letter-spacing:.04em; }
-  #cpop .srow input[type=range]{ flex:1; height:3px; cursor:pointer; accent-color:var(--accent, #79c0ff); }
+  #cpop .srow input[type=range]{ flex:1 1 0; min-width:0; height:3px; cursor:pointer; accent-color:var(--accent, #79c0ff); }
   #cpop .srow .val{ flex:0 0 30px; text-align:right; font-family:var(--mono); color:var(--text-2); }
   #cpop .srow .stp{ flex:0 0 16px; width:16px; height:16px; padding:0; line-height:1; font-size:13px; border:1px solid var(--border); border-radius:4px; background:var(--panel); color:var(--text-2); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
   #cpop .srow .stp:hover{ border-color:var(--accent, #79c0ff); color:var(--text); }
