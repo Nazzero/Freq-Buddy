@@ -168,13 +168,13 @@
   /* small rounded collapse bulge centered on the LEFT edge — sits over the
      splitter only at its center so the rest of the edge stays drag-resizable. */
   #rightcollapse{ position:absolute; top:50%; left:-9px; transform:translateY(-50%); z-index:21;
-    width:14px; height:46px; padding:0; background:#2563eb; color:#dbeafe;
-    border:1px solid #3b82f6; border-right:none; border-radius:8px 0 0 8px;
+    width:14px; height:46px; padding:0; background:var(--accent); color:#fff;
+    border:1px solid var(--accent-2); border-right:none; border-radius:8px 0 0 8px;
     display:flex; align-items:center; justify-content:center; cursor:pointer;
     font-size:12px; line-height:1; box-shadow:-2px 0 6px rgba(0,0,0,.35);
     transition:background .12s,color .12s; }
   #rightcollapse svg{ width:11px; height:11px; }
-  #rightcollapse:hover{ background:#3b82f6; color:#fff; }
+  #rightcollapse:hover{ background:var(--accent-2); color:#fff; }
   /* when collapsed the panel has 0 width, so pin the bulge to the screen's right edge */
   #right.collapsed #rightcollapse{ left:auto; right:0; border-radius:8px 0 0 8px; }
 
