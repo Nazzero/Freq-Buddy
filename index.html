@@ -224,10 +224,12 @@
   #cpop{ position:fixed; z-index:360; width:208px; background:var(--bg-2); border:1px solid var(--border); border-radius:var(--r-md, 8px); box-shadow:0 16px 50px rgba(0,0,0,.6); padding:10px; display:none; }
   #cpop.show{ display:block; }
   #cpop input[type=color]{ width:100%; height:34px; padding:0; border:1px solid var(--border); border-radius:6px; background:none; cursor:pointer; }
-  #cpop .srow{ display:flex; align-items:center; gap:8px; font-size:10px; color:var(--text-3); margin-top:9px; }
-  #cpop .srow label{ flex:0 0 50px; text-transform:uppercase; letter-spacing:.04em; }
+  #cpop .srow{ display:flex; align-items:center; gap:6px; font-size:10px; color:var(--text-3); margin-top:9px; }
+  #cpop .srow label{ flex:0 0 46px; text-transform:uppercase; letter-spacing:.04em; }
   #cpop .srow input[type=range]{ flex:1; height:3px; cursor:pointer; accent-color:var(--accent, #79c0ff); }
-  #cpop .srow .val{ flex:0 0 32px; text-align:right; font-family:var(--mono); color:var(--text-2); }
+  #cpop .srow .val{ flex:0 0 30px; text-align:right; font-family:var(--mono); color:var(--text-2); }
+  #cpop .srow .stp{ flex:0 0 16px; width:16px; height:16px; padding:0; line-height:1; font-size:13px; border:1px solid var(--border); border-radius:4px; background:var(--panel); color:var(--text-2); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+  #cpop .srow .stp:hover{ border-color:var(--accent, #79c0ff); color:var(--text); }
 
   /* ---- indicators MODAL (Favorites / Main plot / Sub-plots) ---- */
   #indmodal{ display:none; position:fixed; inset:0; background:rgba(0,8,24,.66); z-index:300; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
@@ -804,8 +806,8 @@
 </div>
 <div id="cpop">
   <input type="color" id="cpopColor">
-  <div class="srow"><label>Width</label><input type="range" id="cpopWidth" min="0.5" max="5" step="0.1"><span class="val" id="cpopWidthV">1.3</span></div>
-  <div class="srow"><label>Opacity</label><input type="range" id="cpopOpacity" min="0.1" max="1" step="0.05"><span class="val" id="cpopOpacityV">100%</span></div>
+  <div class="srow"><label>Width</label><button type="button" class="stp" id="cpopWidthDn">−</button><input type="range" id="cpopWidth" min="0.5" max="5" step="0.1"><button type="button" class="stp" id="cpopWidthUp">+</button><span class="val" id="cpopWidthV">1.3</span></div>
+  <div class="srow"><label>Opacity</label><button type="button" class="stp" id="cpopOpacityDn">−</button><input type="range" id="cpopOpacity" min="0.1" max="1" step="0.05"><button type="button" class="stp" id="cpopOpacityUp">+</button><span class="val" id="cpopOpacityV">100%</span></div>
 </div>
 <script>
 const API = "";
@@ -1202,6 +1204,17 @@ function openColorPop(anchor, cfg, name){
   cc.oninput=()=>{ cfg.color=cc.value; if(_cpopSw) _cpopSw.style.background=cc.value; render(true); };
   wr.oninput=()=>{ const v=parseFloat(wr.value); wv.textContent=v.toFixed(1); cfg.width=v; render(true); };
   or.oninput=()=>{ const v=parseFloat(or.value); ov.textContent=Math.round(v*100)+"%"; cfg.opacity=v; render(true); };
+  // ± buttons nudge the slider by 5x its native step, clamped to min/max
+  const bump=(rng,dir)=>{
+    const step=parseFloat(rng.step)*5, min=parseFloat(rng.min), max=parseFloat(rng.max);
+    let v=parseFloat(rng.value)+dir*step;
+    v=Math.min(max, Math.max(min, Math.round(v/step)*step));
+    rng.value=v; rng.dispatchEvent(new Event("input"));
+  };
+  document.getElementById("cpopWidthDn").onclick=()=>bump(wr,-1);
+  document.getElementById("cpopWidthUp").onclick=()=>bump(wr, 1);
+  document.getElementById("cpopOpacityDn").onclick=()=>bump(or,-1);
+  document.getElementById("cpopOpacityUp").onclick=()=>bump(or, 1);
   // position next to the swatch, clamped to the viewport
   pop.classList.add("show");
   const r=anchor.getBoundingClientRect();
