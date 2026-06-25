@@ -213,6 +213,17 @@
   .arow select{ background:var(--panel); color:var(--text-2); border:1px solid var(--border); border-radius:4px; font:inherit; font-size:10px; padding:3px 4px; cursor:pointer; }
   .arow .x{ cursor:pointer; color:var(--text-3); padding:0 3px; font-size:13px; }
   .arow .x:hover{ color:var(--danger); }
+  /* per-indicator eye (hide) + style expander (line width / opacity) */
+  .arow .eye, .arow .gear{ cursor:pointer; color:var(--text-3); padding:0 2px; display:inline-flex; align-items:center; flex:0 0 auto; }
+  .arow .eye:hover, .arow .gear:hover{ color:var(--text); }
+  .arow.hiddenind .nm{ opacity:.4; text-decoration:line-through; }
+  .arow.hiddenind input[type=color]{ opacity:.4; }
+  .arow .gear.open{ color:var(--accent, #79c0ff); }
+  .astyle{ display:flex; flex-direction:column; gap:6px; padding:7px 8px 4px 28px; background:var(--bg-2); border:1px solid var(--border-soft); border-top:none; border-radius:0 0 var(--r-sm) var(--r-sm); margin-top:-5px; }
+  .astyle .srow{ display:flex; align-items:center; gap:8px; font-size:10px; color:var(--text-3); }
+  .astyle .srow label{ flex:0 0 46px; text-transform:uppercase; letter-spacing:.04em; }
+  .astyle .srow input[type=range]{ flex:1; height:3px; cursor:pointer; accent-color:var(--accent, #79c0ff); }
+  .astyle .srow .val{ flex:0 0 30px; text-align:right; font-family:var(--mono); color:var(--text-2); }
 
   /* ---- indicators MODAL (Favorites / Main plot / Sub-plots) ---- */
   #indmodal{ display:none; position:fixed; inset:0; background:rgba(0,8,24,.66); z-index:300; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
@@ -1138,6 +1149,7 @@ function buildActive(){
   const maxN = subs.length? Math.max(...subs.map(s=>+s.slice(4))) : -1;
   [...ACTIVE.entries()].forEach(([name,cfg])=>{
     const row=document.createElement("div"); row.className="arow";
+    if(cfg.hidden) row.classList.add("hiddenind");
     const col=document.createElement("input"); col.type="color"; col.value=cfg.color;
     col.oninput=()=>{ cfg.color=col.value; render(true); };
     const nm=document.createElement("span"); nm.className="nm"; nm.textContent=name; nm.title=name;
@@ -1147,10 +1159,37 @@ function buildActive(){
     opts.push(["__new","+ new sub"]);
     opts.forEach(([v,t])=>{ const o=document.createElement("option"); o.value=v; o.textContent=t; if(v===cfg.place)o.selected=true; sel.appendChild(o); });
     sel.onchange=()=>{ cfg.place = sel.value==="__new" ? ("sub:"+(maxN+1)) : sel.value; render(true); buildActive(); };
-    const x=document.createElement("span"); x.className="x"; x.textContent="✕"; x.title="hide";
+    // eye: hide/show the line without removing it from the chart list
+    const eye=document.createElement("span"); eye.className="eye"; eye.title=cfg.hidden?"show":"hide";
+    eye.innerHTML=cfg.hidden
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+    eye.onclick=()=>{ cfg.hidden=!cfg.hidden; render(true); buildActive(); };
+    // gear: expand inline width + opacity controls
+    const gear=document.createElement("span"); gear.className="gear"+(cfg._open?" open":""); gear.title="line style";
+    gear.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.6"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    gear.onclick=()=>{ cfg._open=!cfg._open; buildActive(); };
+    const x=document.createElement("span"); x.className="x"; x.textContent="✕"; x.title="remove";
     x.onclick=()=>{ ACTIVE.delete(name); render(true); buildActive(); buildIndPanel(); };
-    row.appendChild(col); row.appendChild(nm); row.appendChild(sel); row.appendChild(x);
+    row.appendChild(col); row.appendChild(nm); row.appendChild(sel); row.appendChild(eye); row.appendChild(gear); row.appendChild(x);
     list.appendChild(row);
+    // expandable style panel: line width + opacity
+    if(cfg._open){
+      const sp=document.createElement("div"); sp.className="astyle";
+      const w = cfg.width!=null ? cfg.width : 1.3;
+      const op = cfg.opacity!=null ? cfg.opacity : 1;
+      const mkRow=(lbl,min,max,step,val,fmt,apply)=>{
+        const r=document.createElement("div"); r.className="srow";
+        const l=document.createElement("label"); l.textContent=lbl;
+        const rng=document.createElement("input"); rng.type="range"; rng.min=min; rng.max=max; rng.step=step; rng.value=val;
+        const vv=document.createElement("span"); vv.className="val"; vv.textContent=fmt(val);
+        rng.oninput=()=>{ const v=parseFloat(rng.value); vv.textContent=fmt(v); apply(v); render(true); };
+        r.appendChild(l); r.appendChild(rng); r.appendChild(vv); return r;
+      };
+      sp.appendChild(mkRow("Width",0.5,5,0.1,w,v=>v.toFixed(1),v=>cfg.width=v));
+      sp.appendChild(mkRow("Opacity",0.1,1,0.05,op,v=>Math.round(v*100)+"%",v=>cfg.opacity=v));
+      list.appendChild(sp);
+    }
   });
 }
 
@@ -1250,7 +1289,10 @@ function render(preserveRange){
   }
   ACTIVE.forEach((cfg,n)=>{
     const ax = cfg.place==="overlay" ? "y" : axisOf[cfg.place];
-    traces.push({type:"scatter", mode:"lines", x, y:V[n], name:n, xaxis:"x", yaxis:ax, line:{width:1.3, color:cfg.color}});
+    traces.push({type:"scatter", mode:"lines", x, y:V[n], name:n, xaxis:"x", yaxis:ax,
+      visible: cfg.hidden ? "legendonly" : true,
+      opacity: cfg.opacity!=null ? cfg.opacity : 1,
+      line:{width:(cfg.width!=null ? cfg.width : 1.3), color:cfg.color}});
   });
 
   // analysis event markers (on price axis) — visual confirmation of computed edges.
@@ -1423,11 +1465,11 @@ function applyYRange(layout, axKey, preserveRange){
 
 /* ---------------- presets ------------------------------------------------- */
 function snapshotConfig(){
-  const o={}; ACTIVE.forEach((cfg,n)=>{ o[n]={place:cfg.place, color:cfg.color}; }); return o;
+  const o={}; ACTIVE.forEach((cfg,n)=>{ o[n]={place:cfg.place, color:cfg.color, width:cfg.width, opacity:cfg.opacity, hidden:cfg.hidden}; }); return o;
 }
 function applyConfig(cfg){
   ACTIVE.clear();
-  Object.entries(cfg||{}).forEach(([n,c])=>{ ACTIVE.set(n, {place:c.place||defaultPlace(n), color:c.color||nextColor()}); });
+  Object.entries(cfg||{}).forEach(([n,c])=>{ ACTIVE.set(n, {place:c.place||defaultPlace(n), color:c.color||nextColor(), width:c.width, opacity:c.opacity, hidden:!!c.hidden}); });
   render(true); buildActive(); buildIndPanel();
 }
 function loadPresetSel(){
