@@ -397,6 +397,19 @@
   .loading .lt{ font-size:12px; color:var(--text-2); }
   .shimmer{ background:linear-gradient(90deg,var(--text-3) 25%,var(--text) 50%,var(--text-3) 75%); background-size:200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:sh 1.6s linear infinite; }
   @keyframes sh{ to{ background-position:-200% 0; } }
+  /* live step trail: short friendly sentences of what the analyst is doing */
+  .steps{ display:flex; flex-direction:column; gap:3px; margin-top:7px; }
+  .steps .step{ display:flex; align-items:center; gap:7px; font-size:11px; color:var(--text-3); font-family:var(--mono); line-height:1.3; opacity:.55; animation:stepIn .25s ease both; }
+  .steps .step.cur{ color:var(--text-2); opacity:1; }
+  .steps .step .si{ flex:0 0 auto; width:12px; height:12px; display:inline-flex; align-items:center; justify-content:center; }
+  .steps .step.done .si{ color:var(--ok); }
+  .steps .step.cur .si{ color:var(--accent); }
+  .steps .step.cur .si .spin{ animation:stepspin .9s linear infinite; transform-origin:center; }
+  @keyframes stepspin{ to{ transform:rotate(360deg); } }
+  @keyframes stepIn{ from{ opacity:0; transform:translateY(3px); } }
+  /* typewriter caret while the reply streams out */
+  .msg.bot.streaming::after{ content:"▍"; color:var(--accent); animation:cbk .8s step-end infinite; margin-left:1px; }
+  @keyframes cbk{ 50%{ opacity:0; } }
 
   /* composer (TradingView/AI-prompt style) */
   #inputbar{ display:block; padding:12px; border-top:1px solid var(--border); position:relative; background:var(--bg-2); }
@@ -1072,7 +1085,42 @@ function setBot(el, text, model, elapsedMs){
   el.innerHTML = html;
   logEl.scrollTop=logEl.scrollHeight;
 }
-// human-readable elapsed: ms < 1s, else s with 1 decimal under a minute, else m s
+// Stream the final reply out with a typewriter animation, then finish with the
+// fully-rendered markdown + the details footer. Returns a promise that resolves
+// when the animation completes. Skips animation for very long replies (jumps to
+// the end) so big tables don't take forever.
+function streamBot(el, text, model, elapsedMs){
+  return new Promise(resolve=>{
+    const full=(text||"(no reply)");
+    let finished=false;
+    const finish=()=>{ if(finished) return; finished=true;
+      const t=_streamTimers.get(el); if(t){ clearTimeout(t); _streamTimers.delete(el); }
+      _streamFinish.delete(el); el.classList.remove("streaming");
+      setBot(el, full, model, elapsedMs); resolve(); };
+    _streamFinish.set(el, finish);   // let cancelStream snap to the end
+    // Don't typewriter through markdown tables/code blocks or huge replies —
+    // those look broken mid-render. Just render them immediately.
+    if(full.length>1400 || /\n\s*\|/.test(full) || full.includes("```")){ finish(); return; }
+    el.classList.add("bot","streaming");
+    // stream by word for a natural, fast cadence
+    const tokens=full.match(/\S+\s*/g) || [full];
+    let i=0, shown="";
+    const stick= logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 60;
+    const tick=()=>{
+      // reveal a few tokens per frame so longer replies still feel snappy
+      const burst=Math.max(1, Math.round(tokens.length/120));
+      for(let k=0;k<burst && i<tokens.length;k++){ shown+=tokens[i++]; }
+      el.innerHTML=mdRender(shown);
+      if(stick) logEl.scrollTop=logEl.scrollHeight;
+      if(i<tokens.length){ _streamTimers.set(el, setTimeout(tick, 16)); }
+      else finish();
+    };
+    tick();
+  });
+}
+const _streamTimers=new WeakMap();
+const _streamFinish=new WeakMap();
+function cancelStream(el){ const f=_streamFinish.get(el); if(f) f(); }
 function fmtDur2(ms){
   if(ms==null) return "";
   if(ms<1000) return Math.round(ms)+"ms";
@@ -2114,8 +2162,11 @@ async function chatTurn(text, pend, shotPath){
       stopActivityTail();
       stopLoading(pend);
       if(res.cancelled){ pend.classList.add("stopped"); }
-      setBot(pend, res.reply, res.model_used, performance.now()-t0);
+      // stream the reply out with a typewriter animation; run any chart actions
+      // in parallel so the chart updates while the text types.
+      const streaming=streamBot(pend, res.reply, res.model_used, performance.now()-t0);
       if(res.actions&&res.actions.length) await runActions(res.actions);
+      await streaming;
       CUR_MID=null;
       return res;
     }
@@ -2129,6 +2180,8 @@ async function chatTurn(text, pend, shotPath){
 // the in-flight turn id, so the Stop button knows what to cancel
 let CUR_MID=null;
 async function stopCurrentTurn(){
+  // if the reply is currently typing out, snap it to full text immediately
+  document.querySelectorAll(".msg.bot.streaming").forEach(cancelStream);
   if(!CUR_MID) return;
   const id=CUR_MID;
   try{ await fetch(API+"/api/chat/cancel/"+id,{method:"POST"}); }catch(e){}
@@ -2173,13 +2226,69 @@ function renderActivity(events){
   }
 }
 function pushInlineActivity(e){
-  // tiny live line under the loading spinner for the current turn
+  // Turn the raw brain phase/detail into a short, friendly "what it's doing now"
+  // sentence and append it to the live step trail inside the pending bot bubble.
   if(!_actPend) return;
-  const lt=_actPend.querySelector(".lt");
-  if(!lt) return;
-  let now=_actPend.querySelector(".act-now");
-  if(!now){ now=document.createElement("span"); now.className="act-now"; lt.parentElement.appendChild(now); }
-  now.textContent=(e.phase||"")+(e.detail?(" · "+e.detail):"");
+  const friendly=friendlyStep(e);
+  if(!friendly) return;            // skip noise (heartbeats, dupes)
+  addStep(_actPend, friendly, e.phase);
+}
+// Map a raw activity event to {text, kind} or null to skip it.
+function friendlyStep(e){
+  const ph=(e.phase||""), det=(e.detail||"");
+  // decideN / force_answer / answer -> "thinking" style; *_done -> completes it
+  if(/^decide\d+$/.test(ph))        return {text:"Thinking through the question", kind:"think"};
+  if(/^decide\d+_done$/.test(ph))   return null;   // completion handled by next step
+  if(ph==="received")               return {text:"Reading your message and the chart", kind:"read"};
+  if(ph==="fetch")                  return {text:"Pulling indicator / strategy source", kind:"read"};
+  if(ph==="model_call")             return {text:"Writing the analysis plan", kind:"write"};
+  if(ph==="model_call_done")        return null;
+  if(ph==="force_answer")           return {text:"Composing the answer", kind:"write"};
+  if(ph==="op")                     return {text:"Running the calculation in Python", kind:"calc"};
+  if(ph==="op_done"){
+    const ok=/-> ok/.test(det);
+    return {text: ok?"Reading the computed results":"Calculation finished (with an issue)", kind:"read"};
+  }
+  if(ph==="answer")                 return {text:"Writing the final response", kind:"write"};
+  if(ph==="answer_done")            return null;
+  if(ph==="query")                  return {text:"Preparing the data query", kind:"calc"};
+  if(ph==="requeue")                return {text:"Retrying (reconnecting to the analyst)", kind:"think"};
+  if(ph==="timeout")                return {text:"Taking longer than expected…", kind:"think"};
+  if(ph==="stopped"||ph==="cancel") return {text:"Stopped", kind:"done"};
+  if(ph==="error")                  return {text:"Hit an error: "+det.slice(0,60), kind:"err"};
+  if(ph==="done")                   return null;
+  return null;
+}
+const STEP_ICONS={
+  think:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><circle class="spin" cx="12" cy="12" r="9" stroke-dasharray="40 18"/></svg>',
+  read:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M4 5h16M4 12h12M4 19h8"/></svg>',
+  write:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  calc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h2M8 15h2"/></svg>',
+  done:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="12" height="12"><path d="M5 13l4 4L19 7"/></svg>',
+  err:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>',
+};
+const DONE_ICON=STEP_ICONS.done;
+function addStep(pend, f, phase){
+  let wrap=pend.querySelector(".steps");
+  if(!wrap){
+    // first step: drop the generic spinner, start the trail
+    pend.innerHTML='<div class="steps"></div>';
+    wrap=pend.querySelector(".steps");
+  }
+  const prev=wrap.querySelector(".step.cur");
+  if(prev){
+    // collapse identical consecutive steps so the trail stays short
+    if(prev.dataset.text===f.text) return;
+    prev.classList.remove("cur"); prev.classList.add("done");
+    const si=prev.querySelector(".si"); if(si) si.innerHTML=DONE_ICON;
+  }
+  const row=document.createElement("div");
+  row.className="step cur"; row.dataset.text=f.text;
+  row.innerHTML='<span class="si">'+(STEP_ICONS[f.kind]||STEP_ICONS.think)+'</span><span class="st">'+f.text+'</span>';
+  wrap.appendChild(row);
+  // cap the visible trail to the last 6 steps
+  while(wrap.children.length>6) wrap.removeChild(wrap.firstChild);
+  logEl.scrollTop=logEl.scrollHeight;
 }
 async function pollActivity(){
   try{
@@ -2191,7 +2300,9 @@ async function pollActivity(){
       _actSince=evs[evs.length-1].ts;
       _actSeen.push(...evs);
       if(document.body.classList.contains("logs-open")) renderActivity(evs);
-      pushInlineActivity(evs[evs.length-1]);
+      // drive the friendly step trail with EVERY new event (not just the last),
+      // otherwise batched polls drop the meaningful intermediate phases.
+      for(const e of evs) pushInlineActivity(e);
     }
   }catch(e){}
 }
