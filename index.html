@@ -1045,8 +1045,7 @@ async function loadDumpStrategies(){
     strats.forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;sel.appendChild(o);});
     CUR_STRAT=j.current||strats[0]||null;
     if(CUR_STRAT) sel.value=CUR_STRAT;
-    // hide the selector if there's only one (or zero) choice — nothing to pick.
-    sel.style.display = strats.length>1 ? "" : "none";
+    sel.style.display = strats.length ? "" : "none";
   }catch(e){ CUR_STRAT=null; sel.style.display="none"; }
 }
 
