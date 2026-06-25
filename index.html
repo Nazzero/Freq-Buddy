@@ -1233,6 +1233,8 @@ function render(preserveRange){
       type:"scatter", mode:"lines", x, y:V.close,
       name:"price", xaxis:"x", yaxis:"y", visible: SHOW_PRICE ? true : "legendonly",
       line:{width:1.5, color:"#79c0ff"},
+      // measuring with the hover readout off: keep clicks but hide the tooltip
+      ...((MEASURE && !HOVER) ? {hoverinfo:"none"} : {}),
     });
   } else {
     traces.push({
@@ -1240,6 +1242,8 @@ function render(preserveRange){
       name:"price", xaxis:"x", yaxis:"y", visible: (SHOW_PRICE && CANDLE_TYPE!=="hidden") ? true : "legendonly",
       increasing:{line:{color:"#26a69a"}, fillcolor:"rgba(38,166,154,0.9)"},
       decreasing:{line:{color:"#e23636"}, fillcolor:"rgba(226,54,54,0.9)"},
+      // measuring with the hover readout off: keep clicks but hide the tooltip
+      ...((MEASURE && !HOVER) ? {hoverinfo:"none"} : {}),
     });
   }
   ACTIVE.forEach((cfg,n)=>{
@@ -1303,7 +1307,10 @@ function render(preserveRange){
     legend:{bgcolor:"rgba(20,20,20,0.6)", bordercolor:"#2e2e2e", borderwidth:1, font:{size:10}},
     margin:{l:54,r:12,t:12,b:30},
     xaxis:Object.assign({rangeslider:{visible:false}, gridcolor:"#222222", zerolinecolor:"#2e2e2e", domain:[0,1], anchor: nSub? ("y"+(nSub+1)) : "y"}, xSpike),
-    hovermode: HOVER ? "x" : false,
+    // Plotly only emits plotly_click while hovermode is on, and the measure tool
+    // needs those click events. So force hover detection whenever the measure
+    // tool is armed, even if the user turned the hover *readout* off.
+    hovermode: (HOVER || MEASURE) ? "x" : false,
   };
   // preserve x zoom
   const curX = (preserveRange && gd.layout && gd.layout.xaxis) ? gd.layout.xaxis.range : null;
@@ -2010,6 +2017,13 @@ function setMeasure(on){
   document.getElementById("measurebtn").classList.toggle("active",on);
   document.querySelector('.rail[data-tool="cursor"]').classList.toggle("active",!on);
   gd.style.cursor = on ? "crosshair" : "";
+  // the measure tool depends on plotly_click, which Plotly only fires while
+  // hovermode is on. When the hover *readout* is off we still need detection,
+  // so re-render (rebuilds price trace with hoverinfo:"none" + sets hovermode)
+  // to capture clicks without flashing the tooltip. With the readout on, a cheap
+  // relayout is enough.
+  if(!HOVER){ render(true); }
+  else { try{ Plotly.relayout(gd, {hovermode: "x"}); }catch(e){} }
   if(!on) clearMeasure();
 }
 document.getElementById("measurebtn").onclick=()=>setMeasure(!MEASURE);
@@ -2084,8 +2098,14 @@ document.getElementById("hovertog").onclick=(e)=>{
   e.stopPropagation();
   HOVER=!HOVER; localStorage.setItem("cs_hover", HOVER?"1":"0");
   syncCrosshairRail();
-  // instant toggle, no full re-render needed
-  Plotly.relayout(gd, {hovermode: HOVER ? "x" : false});
+  if(MEASURE){
+    // measuring: rebuild so the price trace's hoverinfo matches the new readout
+    // state (none when off) while keeping hovermode on for click capture.
+    render(true);
+  } else {
+    // instant toggle, no full re-render needed
+    Plotly.relayout(gd, {hovermode: HOVER ? "x" : false});
+  }
 };
 // click the trigger to pin/unpin the flyout (also opens on hover via CSS)
 document.getElementById("rulerrail").onclick=(e)=>{
