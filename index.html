@@ -1,0 +1,2697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Chart Sidekick</title>
+<link rel="icon" href="data:,"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+<style>
+  :root{
+    --bg:#0d0d0d; --bg-2:#141414; --panel:#1c1c1c; --panel-2:#262626;
+    --border:#2e2e2e; --border-soft:#222; --grid:#222;
+    --accent:#e23636; --accent-2:#b62828; --accent-soft:rgba(226,54,54,.16);
+    --accent-line:rgba(226,54,54,.45);
+    --text:#e6e6e6; --text-2:#9a9a9a; --text-3:#5f5f5f;
+    --up:#26a69a; --down:#e23636; --danger:#e5534b; --warn:#e3b341; --ok:#56b6c2;
+    --r:8px; --r-sm:6px; --r-lg:12px;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+    --sans:'IBM Plex Sans',-apple-system,'Segoe UI',system-ui,sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; font-family:var(--sans); background:var(--bg); color:var(--text); font-size:13px; -webkit-font-smoothing:antialiased; }
+  #app{ display:flex; height:100vh; }
+  #left{ flex:1; display:flex; flex-direction:column; min-width:0; position:relative; }
+
+  /* ---- toolbar (TradingView-style top bar) ---- */
+  #toolbar{ display:flex; gap:4px; align-items:center; padding:5px 10px; background:var(--bg); border-bottom:1px solid var(--border); flex-wrap:nowrap; min-height:44px; }
+  .tb-div{ width:1px; height:22px; background:var(--border); margin:0 6px; flex:0 0 auto; }
+  .tb-sp{ flex:1 1 auto; }
+  /* timeframe pills */
+  .tb-tf{ display:flex; gap:2px; align-items:center; }
+  .tf{ background:transparent; color:var(--text-2); border:none; border-radius:var(--r-sm); padding:6px 11px; font:inherit; font-size:13px; font-weight:600; cursor:pointer; transition:background .12s,color .12s; }
+  .tf:hover{ background:var(--panel-2); color:var(--text); }
+  .tf.active{ color:var(--ok); }
+  /* icon buttons */
+  .tb-ico{ background:transparent; color:var(--text-2); border:none; border-radius:var(--r-sm); width:34px; height:32px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .12s,color .12s; flex:0 0 auto; }
+  .tb-ico svg{ width:19px; height:19px; }
+  .tb-ico:hover{ background:var(--panel-2); color:var(--text); }
+  .tb-ico.active{ color:var(--accent); }
+  /* text+icon buttons */
+  .tb-text{ background:transparent; color:var(--text); border:none; border-radius:var(--r-sm); padding:6px 10px; font:inherit; font-size:14px; display:inline-flex; align-items:center; gap:7px; cursor:pointer; transition:background .12s; flex:0 0 auto; white-space:nowrap; }
+  .tb-text svg{ width:17px; height:17px; color:var(--text-2); }
+  .tb-text:hover{ background:var(--panel-2); }
+  .tb-text .caret-s{ color:var(--text-3); font-size:11px; }
+  #pair{ background:transparent; color:var(--text); border:1px solid transparent; font-weight:600; font-family:var(--mono); letter-spacing:.3px; padding:5px 8px; border-radius:var(--r-sm); font-size:12px; cursor:pointer; }
+  #pair:hover{ background:var(--panel-2); }
+  #status{ font-family:var(--mono); font-size:10px; color:var(--text-3); white-space:nowrap; margin-left:8px; flex:0 0 auto; }
+  /* toolbar select (timeframe) */
+  .tb-sel{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:var(--r-sm); padding:5px 8px; font:inherit; font-size:13px; font-weight:600; cursor:pointer; flex:0 0 auto; }
+  .tb-sel:hover{ border-color:var(--accent-line); }
+  /* candle type split control */
+  .tb-candle{ position:relative; display:inline-flex; align-items:center; flex:0 0 auto; }
+  .tb-caret{ background:transparent; color:var(--text-3); border:none; cursor:pointer; padding:6px 4px 6px 0; display:inline-flex; align-items:center; }
+  .tb-caret:hover{ color:var(--text); }
+  .candle-pop{ position:absolute; top:38px; left:0; z-index:30; background:var(--panel); border:1px solid var(--border); border-radius:var(--r); padding:4px; display:none; min-width:150px; box-shadow:0 8px 24px rgba(0,0,0,.5); }
+  .candle-pop.show{ display:block; }
+  .cp-item{ display:block; width:100%; text-align:left; background:transparent; color:var(--text); border:none; border-radius:var(--r-sm); padding:8px 10px; font:inherit; font-size:13px; cursor:pointer; }
+  .cp-item:hover{ background:var(--panel-2); }
+  .cp-item.active{ color:var(--accent); }
+  /* floating y-mode button (bottom-right over chart) */
+  #ymodebtn{ position:absolute; z-index:7; right:16px; bottom:42px; min-width:50px; height:36px; padding:0 12px;
+             display:inline-flex; align-items:center; justify-content:center; gap:5px;
+             background:rgba(28,28,28,.9); color:var(--text); border:1px solid var(--border); border-radius:10px;
+             font:700 13px var(--mono); letter-spacing:.5px; cursor:pointer; backdrop-filter:blur(6px);
+             box-shadow:0 4px 14px rgba(0,0,0,.45); transition:background .12s,color .12s,border-color .12s,transform .08s; }
+  #ymodebtn:hover{ background:var(--panel-2); color:#fff; border-color:var(--accent-line); transform:translateY(-1px); }
+  #ymodebtn:active{ transform:translateY(0); }
+  #ymodebtn.log{ color:#fff; background:var(--accent); border-color:var(--accent); }
+  #ymodebtn.log:hover{ background:var(--accent-2); }
+
+  /* chart area split: left rail + chart column */
+  #chartwrap{ flex:1; display:flex; min-height:0; }
+  #leftrail{ width:46px; flex:0 0 auto; background:var(--bg); border-right:1px solid var(--border); display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 0; }
+  .rail{ background:transparent; color:var(--text-2); border:none; border-radius:var(--r-sm); width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:background .12s,color .12s; }
+  .rail svg{ width:20px; height:20px; }
+  .rail:hover{ background:var(--panel-2); color:var(--text); }
+  .rail.active{ color:var(--accent); background:var(--accent-soft); }
+  .rail-sp{ flex:1 1 auto; }
+  /* drawing tools: one rail icon, options fly out horizontally on hover */
+  .drawgroup{ position:relative; }
+  .drawflyout{ position:absolute; left:100%; top:0; margin-left:6px; display:none; flex-direction:row; gap:2px;
+    background:var(--panel-2); border:1px solid var(--border); border-radius:var(--r-md); padding:3px;
+    box-shadow:0 6px 22px rgba(0,0,0,.5); z-index:30; }
+  .drawgroup:hover .drawflyout, .drawflyout:hover, .drawflyout.pin{ display:flex; }
+  /* hover bridge so the gap between trigger and flyout doesn't close it */
+  .drawgroup:hover .drawflyout::before{ content:""; position:absolute; left:-8px; top:0; width:8px; height:100%; }
+  /* crosshair options menu: vertical list of toggle rows */
+  .chmenu{ flex-direction:column; gap:2px; min-width:188px; }
+  .ch-item{ display:flex; align-items:center; gap:9px; width:100%; text-align:left;
+    background:transparent; color:var(--text-2); border:none; border-radius:var(--r-sm);
+    padding:8px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  .ch-item:hover{ background:var(--panel); color:var(--text); }
+  .ch-item svg{ width:16px; height:16px; flex:0 0 auto; opacity:.7; }
+  .ch-item .ch-lab{ flex:1 1 auto; white-space:nowrap; }
+  .ch-item .ch-state{ flex:0 0 auto; font-size:10px; font-weight:700; letter-spacing:.5px;
+    color:var(--text-3); font-family:var(--mono); }
+  .ch-item .ch-state::after{ content:"OFF"; }
+  .ch-item.active{ color:var(--text); }
+  .ch-item.active svg{ opacity:1; color:var(--accent); }
+  .ch-item.active .ch-state{ color:var(--accent); }
+  .ch-item.active .ch-state::after{ content:"ON"; }
+
+  #chartcol{ flex:1; display:flex; flex-direction:column; min-width:0; position:relative; }
+  /* chart header overlay (OHLC line) */
+  #charthead{ position:absolute; z-index:6; top:8px; left:14px; pointer-events:none; font-family:var(--mono); }
+  .chh-row{ display:flex; align-items:center; gap:14px; line-height:1.7; }
+  .chh-pair{ color:var(--text); font-weight:700; font-size:13px; }
+  .chh-tf{ color:var(--ok); font-size:13px; font-weight:600; }
+  .chh-strat{ color:var(--text-2); font-size:13px; }
+  .ohlc{ font-size:12px; color:var(--text-2); }
+  .ohlc b{ color:var(--text-3); font-weight:600; margin-right:2px; }
+  .ohlc i{ color:var(--ok); font-style:normal; }
+  .chh-vol{ font-size:11px; }
+  .chh-lbl{ color:var(--text-2); }
+  .chh-v{ color:var(--text-2); }
+  .chh-v.up{ color:var(--up); }
+  .chh-v.down{ color:var(--down); }
+  /* overlay registry: docked strip BELOW the chart (never floats over the plot) */
+  #overlaybar{ flex:0 0 auto; display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+    padding:6px 12px; background:var(--bg-2); border-top:1px solid var(--border-soft);
+    font-family:var(--mono); max-height:74px; overflow-y:auto; }
+  #overlaybar:empty{ display:none; }
+  #overlaybar .ovbar-lbl{ font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:.6px; flex:0 0 auto; margin-right:2px; }
+  .ovchip{ display:inline-flex; align-items:center; gap:7px; background:var(--panel-2);
+    border:1px solid var(--border-soft); border-left:3px solid var(--accent); border-radius:var(--r-sm);
+    padding:4px 6px 4px 9px; font-size:11px; color:var(--text-2); cursor:pointer; max-width:360px; }
+  .ovchip:hover{ border-color:var(--accent-line); }
+  .ovchip .ovdot{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+  .ovchip .ovlab{ color:var(--text); font-weight:600; white-space:nowrap; }
+  .ovchip .ovmeta{ color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* hidden state: clearly legible (dim border + strike on label), not vanishing */
+  .ovchip.off{ background:transparent; border-style:dashed; border-left-style:solid; }
+  .ovchip.off .ovlab{ color:var(--text-3); text-decoration:line-through; }
+  .ovchip.off .ovdot{ opacity:.45; }
+  .ovchip .ovtog,.ovchip .ovx{ border:none; background:transparent; color:var(--text-3); cursor:pointer;
+    font-size:13px; line-height:1; padding:1px 4px; border-radius:3px; }
+  .ovchip .ovtog:hover,.ovchip .ovx:hover{ background:var(--border-soft); color:var(--text); }
+  .ovchip .ovx:hover{ color:var(--down); }
+
+  #chart{ flex:1; }
+  /* Y-axis zoom strip: drag up/down on the left edge to zoom the price scale only. */
+  #yzone{ position:absolute; z-index:5; cursor:ns-resize; background:transparent; border:none; display:none; }
+  #yzone .yhint{ display:none; }
+  #subsplit{ position:absolute; left:0; right:0; height:9px; z-index:6; cursor:ns-resize; display:none;
+             background:transparent; transition:background .12s; }
+  #subsplit:hover, #subsplit.dragging{ background:linear-gradient(rgba(34,211,238,0)0%, rgba(34,211,238,0.18)50%, rgba(34,211,238,0)100%); }
+  #subsplit .sshint{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+                     width:46px; height:3px; border-radius:2px; background:#3a4154; }
+  #subsplit:hover .sshint, #subsplit.dragging .sshint{ background:var(--accent-line); }
+
+  #splitter{ width:6px; cursor:col-resize; background:var(--panel); border-left:1px solid var(--border); flex:0 0 auto; }
+  #splitter:hover{ background:var(--accent-line); }
+
+  /* ---- right panel ---- */
+  #right{ width:560px; display:flex; flex-direction:column; background:var(--bg); border-left:1px solid var(--border); min-width:0; }
+  #right.collapsed{ width:0 !important; border:none; overflow:hidden; }
+  #rightcollapse{ position:absolute; top:9px; right:9px; z-index:20; background:var(--panel); color:var(--text-2); border:1px solid var(--border); border-radius:var(--r-sm); width:26px; height:26px; padding:0; font-size:13px; cursor:pointer; }
+  #rightcollapse:hover{ border-color:var(--accent); color:var(--text); }
+
+  /* presets bar */
+  #presetbar{ display:flex; gap:8px; align-items:center; padding:10px 12px; background:var(--bg-2); border-bottom:1px solid var(--border-soft); flex-wrap:nowrap; }
+  #presetbar .lbl{ font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:.6px; flex:0 0 auto; }
+  #presetbar select{ flex:1 1 auto; min-width:0; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:9px; padding:7px 10px; font:inherit; font-size:12px; cursor:pointer; transition:border-color .12s; }
+  #presetbar select:hover{ border-color:var(--accent-line); }
+  .pb-icon{ display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; flex:0 0 auto; background:var(--panel); color:var(--text-3); border:1px solid var(--border); border-radius:9px; cursor:pointer; transition:background .12s,color .12s,border-color .12s; }
+  .pb-icon:hover{ background:var(--panel-2); color:var(--accent); border-color:var(--accent-line); }
+  .pb-icon svg{ width:17px; height:17px; }
+  .pb-save{ display:inline-flex; align-items:center; gap:6px; flex:0 0 auto; height:34px; padding:0 14px; background:var(--accent); color:#fff; border:none; border-radius:9px; font:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:background .12s; }
+  .pb-save:hover{ background:var(--accent-2); }
+  .pb-save svg{ width:16px; height:16px; }
+
+  /* active 'On chart' panel */
+  #activepanel{ border-bottom:1px solid var(--border-soft); }
+  #activehead{ display:flex; align-items:center; gap:8px; padding:9px 10px; background:var(--bg-2); user-select:none; }
+  #activehead .ttl{ font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--text-2); cursor:pointer; }
+  #activehead .count{ font-size:10px; color:var(--text-3); font-family:var(--mono); }
+  #activehead .sp{ margin-left:auto; }
+  #activehead button{ background:var(--panel); color:var(--text-2); border:1px solid var(--border); border-radius:var(--r-sm); padding:4px 9px; font:inherit; font-size:10px; cursor:pointer; }
+  #activehead button:hover{ border-color:var(--accent); color:var(--text); }
+  #activeadd{ color:var(--accent) !important; border-color:var(--accent-line) !important; }
+  #activeadd:hover{ background:var(--accent-soft) !important; }
+  .caret{ font-size:10px; color:var(--text-3); transition:transform .12s; cursor:pointer; }
+  #activepanel.collapsed .caret{ transform:rotate(-90deg); }
+  #activepanel.collapsed #activelist{ display:none; }
+  #activepanel.collapsed + #rsplit{ display:none; }
+  #activelist{ max-height:26vh; overflow-y:auto; padding:6px; display:flex; flex-direction:column; gap:4px; }
+  /* horizontal drag handle: resize On-chart list vs Sidekick chat */
+  #rsplit{ height:8px; flex:0 0 auto; cursor:ns-resize; background:var(--bg-2);
+    border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:center;
+    transition:background .12s; }
+  #rsplit:hover, #rsplit.dragging{ background:var(--accent-soft); }
+  #rsplit .rshint{ width:42px; height:3px; border-radius:2px; background:#3a4154; }
+  #rsplit:hover .rshint, #rsplit.dragging .rshint{ background:var(--accent-line); }
+  .arow{ display:flex; align-items:center; gap:7px; padding:6px 8px; font-size:11px; background:var(--bg-2); border:1px solid var(--border-soft); border-radius:var(--r-sm); }
+  .arow:hover{ border-color:var(--border); }
+  .arow input[type=color]{ width:20px; height:20px; padding:0; border:1px solid var(--border); border-radius:4px; background:none; cursor:pointer; flex:0 0 auto; }
+  .arow .nm{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:var(--mono); }
+  .arow select{ background:var(--panel); color:var(--text-2); border:1px solid var(--border); border-radius:4px; font:inherit; font-size:10px; padding:3px 4px; cursor:pointer; }
+  .arow .x{ cursor:pointer; color:var(--text-3); padding:0 3px; font-size:13px; }
+  .arow .x:hover{ color:var(--danger); }
+
+  /* ---- indicators MODAL (Favorites / Main plot / Sub-plots) ---- */
+  #indmodal{ display:none; position:fixed; inset:0; background:rgba(0,8,24,.66); z-index:300; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+  #indmodal.show{ display:flex; }
+  #indcard{ background:var(--bg-2); border:1px solid var(--border); border-radius:var(--r-lg); width:min(620px,94vw); max-height:84vh; display:flex; flex-direction:column; box-shadow:0 24px 70px rgba(0,0,0,.6); overflow:hidden; }
+  #indmhead{ display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border); }
+  #indmhead .ttl{ font-size:14px; font-weight:700; }
+  #indmhead .count{ font-size:11px; color:var(--text-3); font-family:var(--mono); }
+  #indmclose{ margin-left:auto; background:var(--panel); color:var(--text-2); border:1px solid var(--border); border-radius:var(--r-sm); width:28px; height:28px; cursor:pointer; font-size:14px; }
+  #indmclose:hover{ border-color:var(--accent); color:var(--text); }
+  #indsearchwrap{ padding:12px 16px 0; }
+  #indsearch{ width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:var(--r); padding:9px 12px; font:inherit; font-size:13px; }
+  #indsearch:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  #indtabs{ display:flex; gap:4px; padding:12px 16px 0; }
+  .indtab{ flex:1; background:var(--panel); color:var(--text-2); border:1px solid var(--border); border-radius:var(--r-sm); padding:7px 6px; font:inherit; font-size:12px; font-weight:500; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:.12s; }
+  .indtab:hover{ color:var(--text); }
+  .indtab.on{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .indtab .b{ font-family:var(--mono); font-size:10px; opacity:.85; background:var(--bg); border-radius:10px; padding:1px 6px; }
+  .indtab.on .b{ background:rgba(226,54,54,.25); }
+  #indlist{ overflow-y:auto; padding:12px 16px 16px; }
+  .cat{ margin-top:6px; }
+  .cat-h{ display:flex; align-items:center; gap:6px; cursor:pointer; padding:5px 2px; font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:.6px; user-select:none; }
+  .cat-h .arrow{ transition:transform .12s; }
+  .cat.collapsed .arrow{ transform:rotate(-90deg); }
+  .cat.collapsed .chips{ display:none; }
+  .chips{ display:flex; flex-wrap:wrap; gap:5px; padding:4px 0 6px 6px; }
+  .tchip{ display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:5px 9px; border-radius:7px; border:1px solid var(--border); cursor:pointer; background:var(--panel); white-space:nowrap; transition:.1s; font-family:var(--mono); }
+  .tchip:hover{ border-color:var(--accent); background:var(--panel-2); }
+  .tchip.on{ background:var(--accent-soft); border-color:var(--accent); color:#fff; }
+  .tchip .star{ cursor:pointer; color:var(--text-3); font-size:12px; line-height:1; }
+  .tchip .star.fav{ color:var(--warn); }
+  #indempty{ color:var(--text-3); padding:18px; text-align:center; font-size:12px; }
+
+  /* ---- chat ---- */
+  .skhead{ display:flex; align-items:center; gap:8px; padding:11px 12px; background:var(--bg-2); border-bottom:1px solid var(--border); border-top:1px solid var(--border); }
+  .skhead .dot{ width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok); }
+  .skhead .ttl{ font-size:13px; font-weight:700; letter-spacing:.2px; }
+  .skhead .sub{ margin-left:auto; font-size:10px; color:var(--text-3); font-family:var(--mono); }
+  #logsbtn{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; padding:0; background:transparent; border:1px solid var(--border); border-radius:7px; color:var(--text-3); cursor:pointer; }
+  #logsbtn:hover{ color:var(--text); border-color:var(--accent); }
+  #logsbtn.live{ color:var(--accent); border-color:var(--accent); }
+  #logsbtn svg{ width:15px; height:15px; }
+  #newchatbtn{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; padding:0; background:transparent; border:1px solid var(--border); border-radius:7px; color:var(--text-3); cursor:pointer; }
+  #newchatbtn:hover{ color:var(--text); border-color:var(--accent); }
+  #newchatbtn svg{ width:15px; height:15px; }
+  /* activity log panel — replaces the chat log area when open */
+  #logspanel{ display:none; flex-direction:column; min-height:0; flex:1; background:var(--bg); }
+  #logspanel.show{ display:flex; }
+  body.logs-open #log{ display:none; }
+  #logshead{ display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--bg-2); border-bottom:1px solid var(--border); font-size:12px; font-weight:700; }
+  #logsmeta{ margin-left:auto; font-size:10px; font-weight:400; color:var(--text-3); font-family:var(--mono); }
+  #logsclose{ background:transparent; border:none; color:var(--text-3); cursor:pointer; font-size:14px; line-height:1; padding:2px 4px; }
+  #logsclose:hover{ color:var(--text); }
+  #logsbody{ flex:1; overflow-y:auto; padding:8px 10px; font-family:var(--mono); font-size:11px; display:flex; flex-direction:column; gap:3px; }
+  .logrow{ display:flex; gap:8px; align-items:baseline; padding:3px 5px; border-radius:5px; }
+  .logrow:hover{ background:var(--bg-2); }
+  .logrow .lt-ts{ color:var(--text-3); flex:0 0 auto; }
+  .logrow .lt-ph{ flex:0 0 64px; font-weight:700; color:var(--accent); }
+  .logrow .lt-de{ flex:1; white-space:pre-wrap; word-break:break-word; color:var(--text-2); }
+  .logrow .lt-ms{ color:var(--text-3); }
+  .logrow.ph-error .lt-ph{ color:var(--down,#e2616a); }
+  .logrow.ph-done .lt-ph{ color:var(--ok); }
+  #logsempty{ color:var(--text-3); padding:14px; text-align:center; }
+  /* tiny live status line under the loading spinner */
+  .loading .act-now{ display:block; margin-top:5px; font-size:10px; color:var(--text-3); font-family:var(--mono); }
+  .msg.bot.stopped{ opacity:.85; }
+  #busydot{ display:none; width:8px; height:8px; border-radius:50%; background:var(--accent); margin-left:2px; animation:pulse 1s ease-in-out infinite; }
+  #busydot.on{ display:inline-block; }
+  @keyframes pulse{ 0%,100%{ opacity:.3; } 50%{ opacity:1; } }
+
+  #log{ flex:1; overflow-y:auto; padding:14px 14px 18px; display:flex; flex-direction:column; gap:14px; }
+  .msg{ padding:0; max-width:100%; word-wrap:break-word; font-size:14px; line-height:1.62; }
+  .msg.user, .msg.sys{ white-space:pre-wrap; }
+  /* user keeps a compact bubble, right-aligned */
+  .user{ background:var(--accent); color:#fff; align-self:flex-end; border-radius:12px 12px 3px 12px; font-weight:500; max-width:88%; padding:9px 12px; }
+  /* assistant = flat full-width markdown (Claude-web feel): no bubble, no inner scroll */
+  .bot{ background:transparent; align-self:stretch; border:none; border-radius:0; width:100%; max-width:100%; padding:2px 0 4px; }
+  .bot p{ margin:0 0 9px; } .bot p:last-child{ margin-bottom:0; }
+  .bot ul, .bot ol{ margin:5px 0 9px; padding-left:22px; }
+  .bot li{ margin:4px 0; }
+  .bot code{ background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-size:12.5px; font-family:var(--mono); }
+  .bot pre{ background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:11px 12px; overflow-x:auto; margin:9px 0; }
+  .bot pre code{ border:none; padding:0; background:none; font-size:12.5px; }
+  /* tables: readable; scroll horizontally if too wide rather than shattering labels */
+  .bot .tblwrap{ overflow-x:auto; margin:10px 0; border-radius:6px; }
+  .bot table{ border-collapse:collapse; margin:0; font-size:12.5px; min-width:100%; font-family:var(--mono); }
+  .bot th, .bot td{ border:1px solid var(--border); padding:5px 9px; text-align:right; white-space:nowrap; vertical-align:top; }
+  .bot td:first-child, .bot th:first-child{ text-align:left; }
+  .bot th{ background:var(--bg-2); font-weight:600; }
+  .bot h1,.bot h2,.bot h3,.bot h4{ margin:12px 0 6px; font-size:14px; }
+  .bot strong{ color:var(--warn); }
+  .bot blockquote{ margin:9px 0; padding-left:11px; border-left:3px solid var(--accent-line); color:var(--text-2); }
+  .sys{ color:var(--text-3); font-size:11px; align-self:center; text-align:center; }
+
+  /* collapsible meta line inside bot bubble */
+  .meta{ margin-top:8px; font-size:10px; }
+  .meta summary{ list-style:none; cursor:pointer; color:var(--text-3); font-family:var(--mono); display:inline-flex; align-items:center; gap:5px; user-select:none; }
+  .meta summary::-webkit-details-marker{ display:none; }
+  .meta summary::before{ content:"›"; transition:transform .12s; display:inline-block; }
+  .meta[open] summary::before{ transform:rotate(90deg); }
+  .meta .mbody{ margin-top:6px; color:var(--text-3); font-family:var(--mono); line-height:1.5; }
+  .meta .mdl{ color:var(--warn); }
+
+  /* AI action chips */
+  .acts{ align-self:flex-start; display:flex; flex-wrap:wrap; gap:5px; max-width:92%; }
+  .achip{ display:inline-flex; align-items:center; gap:6px; font-size:11px; padding:4px 10px; border-radius:20px; background:var(--accent-soft); border:1px solid var(--accent-line); color:var(--text); font-family:var(--mono); }
+  .achip .g{ color:var(--accent); font-weight:700; }
+  .achip.unknown{ background:var(--bg-2); border-color:var(--border); color:var(--text-3); }
+
+  /* AI loading animation */
+  .loading{ display:flex; align-items:center; gap:9px; }
+  .loading .dots{ display:inline-flex; gap:4px; }
+  .loading .dots i{ width:7px; height:7px; border-radius:50%; background:var(--accent); display:inline-block; animation:ld 1.1s ease-in-out infinite; }
+  .loading .dots i:nth-child(2){ animation-delay:.18s; }
+  .loading .dots i:nth-child(3){ animation-delay:.36s; }
+  @keyframes ld{ 0%,80%,100%{ transform:translateY(0); opacity:.4; } 40%{ transform:translateY(-5px); opacity:1; } }
+  .loading .lt{ font-size:12px; color:var(--text-2); }
+  .shimmer{ background:linear-gradient(90deg,var(--text-3) 25%,var(--text) 50%,var(--text-3) 75%); background-size:200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; animation:sh 1.6s linear infinite; }
+  @keyframes sh{ to{ background-position:-200% 0; } }
+
+  /* composer (TradingView/AI-prompt style) */
+  #inputbar{ display:block; padding:12px; border-top:1px solid var(--border); position:relative; background:var(--bg-2); }
+  #promptcard{ background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:6px; transition:border-color .12s, box-shadow .12s; }
+  #promptcard:focus-within{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  #input{ width:100%; background:transparent; color:var(--text); border:none; outline:none; padding:10px 12px 6px; font:inherit; resize:none; min-height:46px; max-height:240px; overflow-y:auto; line-height:1.5; }
+  #input::placeholder{ color:var(--text-3); }
+  #promptfoot{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:2px 4px 2px; }
+  #promptfoot .pf-left{ display:flex; align-items:center; gap:6px; min-width:0; }
+  .pf-div{ width:1px; height:18px; background:var(--border); margin:0 2px; flex:0 0 auto; }
+  /* model dropdown trigger */
+  .modelwrap{ position:relative; flex:0 0 auto; }
+  .modelbtn{ display:inline-flex; align-items:center; gap:6px; background:transparent; color:var(--text); border:none; border-radius:10px; padding:6px 8px; font:inherit; font-size:12px; cursor:pointer; transition:background .12s; }
+  .modelbtn:hover{ background:var(--panel-2); }
+  .model-ic{ display:inline-flex; width:16px; height:16px; align-items:center; justify-content:center; }
+  .model-ic svg{ width:15px; height:15px; }
+  .model-name{ max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .model-caret{ width:13px; height:13px; opacity:.5; flex:0 0 auto; }
+  .modelpop{ position:absolute; bottom:42px; left:0; z-index:60; min-width:200px; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:5px; display:none; box-shadow:0 12px 32px rgba(0,0,0,.55); max-height:300px; overflow-y:auto; }
+  .modelpop.show{ display:block; }
+  .mp-item{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:transparent; color:var(--text); border:none; border-radius:8px; padding:8px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  .mp-item:hover{ background:var(--panel-2); }
+  .mp-item .mp-ic{ width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; }
+  .mp-item .mp-ic svg{ width:15px; height:15px; }
+  .mp-item .mp-nm{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mp-item .mp-chk{ width:14px; height:14px; color:var(--accent); opacity:0; }
+  .mp-item.sel .mp-chk{ opacity:1; }
+  /* attach (+) */
+  .attachbtn{ display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:10px; background:var(--panel-2); color:var(--text-3); cursor:pointer; transition:background .12s,color .12s; }
+  .attachbtn:hover{ background:var(--border); color:var(--text); }
+  .attachbtn svg{ width:18px; height:18px; }
+  /* send arrow */
+  #send{ display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; background:var(--accent); color:#fff; border:none; border-radius:11px; cursor:pointer; transition:background .12s, opacity .2s; flex:0 0 auto; }
+  #send:hover:not(:disabled){ background:var(--accent-2); }
+  #send:disabled{ opacity:.35; cursor:default; }
+  #send svg{ width:18px; height:18px; }
+  /* busy = show a clickable STOP square instead of the send arrow */
+  #send .stop-ic{ display:none; }
+  #send.busy{ background:var(--down,#e2616a); opacity:1; cursor:pointer; }
+  #send.busy:disabled{ opacity:1; cursor:pointer; }
+  #send.busy .send-ic{ display:none; }
+  #send.busy .stop-ic{ display:inline-flex; }
+
+  /* indicator autocomplete dropdown */
+  #acbox{ position:absolute; bottom:100%; left:10px; right:10px; margin-bottom:4px; background:var(--panel); border:1px solid var(--border); border-radius:var(--r); max-height:220px; overflow-y:auto; z-index:50; display:none; box-shadow:0 -8px 24px rgba(0,0,0,.5); }
+  #acbox.show{ display:block; }
+  .acitem{ padding:7px 12px; font-size:12px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:var(--mono); }
+  .acitem .cat{ color:var(--text-3); font-size:10px; margin-left:6px; }
+  .acitem.sel, .acitem:hover{ background:var(--accent-soft); }
+
+  /* history modal */
+  #histmodal{ display:none; position:fixed; inset:0; background:rgba(0,8,24,.66); z-index:200; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+  #histmodal.show{ display:flex; }
+  #histcard{ background:var(--bg-2); border:1px solid var(--border); border-radius:var(--r-lg); width:min(760px,92vw); max-height:82vh; display:flex; flex-direction:column; box-shadow:0 24px 70px rgba(0,0,0,.6); }
+  #histhead{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--border); font-size:14px; font-weight:700; }
+  #histclose{ background:var(--panel); color:var(--text-2); border:1px solid var(--border); border-radius:var(--r-sm); width:28px; height:28px; cursor:pointer; font-size:14px; }
+  #histclose:hover{ border-color:var(--accent); color:var(--text); }
+  #histlist{ overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }
+  .hrow{ border:1px solid var(--border-soft); border-radius:var(--r); padding:10px 12px; background:var(--panel); }
+  .hrow .hq{ font-size:12px; color:var(--text); margin-bottom:5px; white-space:pre-wrap; }
+  .hrow .hmeta{ font-size:10px; color:var(--text-3); display:flex; gap:10px; flex-wrap:wrap; margin-bottom:6px; font-family:var(--mono); }
+  .hrow .hmeta .mdl{ color:var(--warn); }
+  .hrow .ha{ font-size:11px; color:var(--text-2); max-height:0; overflow:hidden; transition:max-height .15s; }
+  .hrow.open .ha{ max-height:600px; overflow-y:auto; margin-top:6px; }
+  .hrow .hbtns{ display:flex; gap:6px; margin-top:8px; }
+  .hrow button{ background:var(--panel-2); color:var(--text-2); border:1px solid var(--border); border-radius:var(--r-sm); padding:4px 10px; font:inherit; font-size:11px; cursor:pointer; }
+  .hrow button.resume{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .hrow button.hdel{ margin-left:auto; color:#e2616a; }
+  .hrow button.hdel:hover{ border-color:#e2616a; background:rgba(226,97,106,.12); }
+  .hrow button:hover{ border-color:var(--accent); }
+  #histlist .sys{ padding:16px; text-align:center; }
+
+  /* ---- backtest modal ---- */
+  #btmodal{ display:none; position:fixed; inset:0; background:rgba(0,8,24,.66); z-index:200; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+  #btmodal.show{ display:flex; }
+  #btcard{ background:var(--bg-2); border:1px solid var(--border); border-radius:var(--r-lg); width:min(1040px,94vw); max-height:88vh; display:flex; flex-direction:column; box-shadow:0 24px 70px rgba(0,0,0,.6); }
+  #bthead{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid var(--border); font-size:14px; font-weight:700; }
+  #btclose{ background:var(--panel); color:var(--text-2); border:1px solid var(--border); border-radius:var(--r-sm); width:28px; height:28px; cursor:pointer; font-size:14px; }
+  #btclose:hover{ border-color:var(--accent); color:var(--text); }
+  #btbody{ overflow-y:auto; padding:14px 16px; }
+  .btcols{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .btsec{ margin-bottom:14px; }
+  .btlabel{ font-size:11px; font-weight:700; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; margin-bottom:7px; }
+  .bthint{ font-weight:400; text-transform:none; letter-spacing:0; color:var(--text-3); }
+  .condlist{ display:flex; flex-direction:column; gap:6px; margin-bottom:6px; }
+  .cond{ display:flex; gap:5px; align-items:center; }
+  .cond select, .cond input{ background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:var(--r-sm); padding:5px 6px; font:inherit; font-size:11px; min-width:0; }
+  .cond .c-left{ flex:1 1 40%; }
+  .cond .c-op{ flex:0 0 96px; }
+  .cond .c-right{ flex:1 1 40%; }
+  .cond .c-del{ flex:0 0 24px; background:var(--panel-2); color:#e2616a; border:1px solid var(--border); border-radius:var(--r-sm); cursor:pointer; padding:5px 0; }
+  .cond .c-del:hover{ border-color:#e2616a; background:rgba(226,97,106,.12); }
+  .addcond{ background:var(--panel-2); color:var(--text-2); border:1px dashed var(--border); border-radius:var(--r-sm); padding:5px 10px; font:inherit; font-size:11px; cursor:pointer; }
+  .addcond:hover{ border-color:var(--accent); color:var(--text); }
+  .pairchips{ display:flex; flex-wrap:wrap; gap:6px; max-height:96px; overflow-y:auto; }
+  .pairchips .chip{ font-size:11px; padding:4px 9px; border:1px solid var(--border); border-radius:999px; background:var(--panel); color:var(--text-2); cursor:pointer; user-select:none; }
+  .pairchips .chip.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  #bt-strat{ width:100%; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:var(--r-sm); padding:8px; font:inherit; font-size:13px; }
+  .btgrid{ display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; }
+  .btgrid label{ display:flex; flex-direction:column; gap:3px; font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:.3px; }
+  .btgrid input, .btgrid select{ background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:var(--r-sm); padding:6px; font:inherit; font-size:12px; }
+  .btgrid label.ckl{ flex-direction:row; align-items:center; gap:6px; text-transform:none; letter-spacing:0; font-size:11px; color:var(--text-2); }
+  .btgrid label.ckl input{ width:auto; }
+  .btactions{ display:flex; align-items:center; gap:12px; margin-top:14px; }
+  .bt-run{ background:var(--accent); color:#fff; border:none; border-radius:var(--r-sm); padding:9px 20px; font:inherit; font-weight:700; font-size:13px; cursor:pointer; }
+  .bt-run:hover{ filter:brightness(1.08); }
+  .bt-run:disabled{ opacity:.5; cursor:default; }
+  .bt-status{ font-size:11px; color:var(--text-3); font-family:var(--mono); }
+  .bt-status.err{ color:#e2616a; }
+  .btresult{ margin-top:14px; border-top:1px solid var(--border); padding-top:12px; display:none; }
+  .btresult.show{ display:block; }
+  .btstats{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .btstat{ background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--r); padding:8px 12px; min-width:96px; }
+  .btstat .v{ font-size:16px; font-weight:700; color:var(--text); font-family:var(--mono); }
+  .btstat .v.pos{ color:#3fb27f; } .btstat .v.neg{ color:#e2616a; }
+  .btstat .k{ font-size:9px; color:var(--text-3); text-transform:uppercase; letter-spacing:.4px; margin-top:2px; }
+  .bttrades{ max-height:240px; overflow-y:auto; border:1px solid var(--border-soft); border-radius:var(--r); }
+  .bttrades table{ width:100%; border-collapse:collapse; font-size:11px; font-family:var(--mono); }
+  .bttrades th{ position:sticky; top:0; background:var(--panel-2); color:var(--text-3); font-weight:600; text-align:left; padding:6px 8px; font-size:10px; }
+  .bttrades td{ padding:5px 8px; border-top:1px solid var(--border-soft); color:var(--text-2); }
+  .bttrades td.pos{ color:#3fb27f; } .bttrades td.neg{ color:#e2616a; }
+  .btmark{ background:var(--panel-2); border:1px solid var(--border); border-radius:var(--r-sm); padding:6px 12px; font:inherit; font-size:11px; color:var(--text-2); cursor:pointer; margin-top:10px; }
+  .btmark:hover{ border-color:var(--accent); color:var(--text); }
+  /* past-backtests picker (Option B): pick which stored runs show on the chart */
+  .btpast{ margin-top:14px; border-top:1px solid var(--border); padding-top:12px; }
+  .btpast-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .btpast-head .t{ font-size:11px; font-weight:700; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; }
+  .btpast-clear{ background:transparent; border:1px solid var(--border); border-radius:var(--r-sm); color:var(--text-3); font:inherit; font-size:10px; padding:3px 8px; cursor:pointer; }
+  .btpast-clear:hover{ border-color:var(--down); color:var(--down); }
+  .btpast-list{ display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; }
+  .btpast-row{ display:flex; align-items:center; gap:9px; padding:6px 8px; border:1px solid var(--border-soft); border-radius:var(--r-sm); background:var(--panel); font-size:11px; }
+  .btpast-row input[type=checkbox]{ cursor:pointer; flex:0 0 auto; }
+  .btpast-row .pdot{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+  .btpast-row .plab{ color:var(--text); font-weight:600; white-space:nowrap; }
+  .btpast-row .pmeta{ color:var(--text-3); flex:1 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .btpast-row .pgo{ background:transparent; border:none; color:var(--text-3); cursor:pointer; font-size:12px; padding:1px 5px; border-radius:3px; }
+  .btpast-row .pgo:hover{ background:var(--border-soft); color:var(--accent); }
+  .btpast-row .px{ background:transparent; border:none; color:var(--text-3); cursor:pointer; font-size:12px; padding:1px 5px; border-radius:3px; }
+  .btpast-row .px:hover{ color:var(--down); }
+  .btpast-empty{ color:var(--text-3); font-size:11px; }
+  @media(max-width:820px){ .btcols{ grid-template-columns:1fr; } }
+
+  /* scrollbars */
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  ::-webkit-scrollbar-thumb{ background:var(--panel-2); border-radius:6px; border:2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover{ background:var(--border); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="left">
+    <div id="toolbar">
+      <select class="tb-sel" id="tfsel" title="timeframe (resampled from 15m base)">
+        <option value="15m">15m</option>
+        <option value="30m">30m</option>
+        <option value="1h">1h</option>
+        <option value="2h">2h</option>
+        <option value="4h">4h</option>
+        <option value="6h">6h</option>
+        <option value="8h">8h</option>
+        <option value="12h">12h</option>
+        <option value="1d">1D</option>
+      </select>
+      <span class="tb-div"></span>
+      <button class="tb-ico" id="legendtoggle" title="show/hide chart legend">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18l4-7 4 4 4-9 4 6"/></svg>
+      </button>
+      <div class="tb-candle" id="candlewrap">
+        <button class="tb-ico" id="pricetoggle" title="show/hide candles">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 4v4M7 16v4M17 4v3M17 17v3"/><rect x="4.5" y="8" width="5" height="8" rx="1"/><rect x="14.5" y="7" width="5" height="10" rx="1"/></svg>
+        </button>
+        <button class="tb-caret" id="candlemenu" title="candle type"><span class="caret-s">▾</span></button>
+        <div class="candle-pop" id="candlepop">
+          <button class="cp-item active" data-ct="candles">Candles</button>
+          <button class="cp-item" data-ct="heikin">Heikin-Ashi</button>
+          <button class="cp-item" data-ct="line">Line</button>
+          <button class="cp-item" data-ct="hidden">Hide candles</button>
+        </div>
+      </div>
+      <span class="tb-div"></span>
+      <button class="tb-text" id="indopen" title="add indicators to the chart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v8M5 12h2.5M5 17h2.5"/><path d="M11.5 5v11M11.5 7h2.5M11.5 13h2.5"/><path d="M18 8v9M18 10h2.5M18 16h2.5" transform="translate(-1.5)"/><path d="M2 6c2 1.5 3.5 1 5.5-1S11 1.5 13 3.5 16.5 7 20 5"/></svg>
+        Indicators <span class="caret-s">▾</span>
+      </button>
+      <button class="tb-text" id="histbtn" title="past sessions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>
+        History
+      </button>
+      <button class="tb-text" id="btbtn" title="build &amp; run a backtest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16l3-4 3 2 4-6"/></svg>
+        Backtest
+      </button>
+      <select id="pair" title="pair"></select>
+      <span class="tb-sp"></span>
+      <button class="tb-ico" id="resetzoom" title="undo / reset zoom">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
+      </button>
+      <button class="tb-ico" id="reload" title="redo / reload data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h1"/></svg>
+      </button>
+      <span class="tb-div"></span>
+      <button class="tb-ico" id="snapbtn" title="screenshot chart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L18 8h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.2"/></svg>
+      </button>
+      <span class="tb-div"></span>
+      <span id="status">loading…</span>
+    </div>
+    <div id="chartwrap">
+      <div id="leftrail">
+        <button class="rail measure-off active" data-tool="cursor" title="cursor / crosshair">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></svg>
+        </button>
+        <button class="rail" id="measurebtn" title="measure tool: click two points">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.4" y="8.4" width="19.2" height="7.2" rx="1" transform="rotate(-45 12 12)"/><path d="M9.1 6.9l1.8 1.8M11.6 9.4l1 1M12.7 4.5l1.8 1.8M15.2 7l1 1M16.3 2.1l1.8 1.8"/></svg>
+        </button>
+        <div class="drawgroup">
+          <button class="rail" id="drawbtn" title="drawing tools">
+            <svg id="drawbtnico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <div class="drawflyout" id="drawflyout">
+            <button class="rail" id="drawpenbtn" data-draw="drawopenpath" title="freehand pen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            </button>
+            <button class="rail" id="drawlinebtn" data-draw="drawline" title="straight line">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20L20 4"/><circle cx="4" cy="20" r="1.6" fill="currentColor" stroke="none"/><circle cx="20" cy="4" r="1.6" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <button class="rail" id="drawarrowbtn" data-draw="arrow" title="arrow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19L19 5"/><path d="M11 5h8v8"/></svg>
+            </button>
+            <button class="rail" id="drawrectbtn" data-draw="drawrect" title="rectangle / zone">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="1"/></svg>
+            </button>
+            <button class="rail" id="drawcirclebtn" data-draw="drawcircle" title="circle / ellipse">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="drawgroup">
+          <button class="rail" id="erasergroupbtn" title="erase tools">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21h10M5 13l6-6 7 7-5 5H8z"/><path d="M11 7l7 7"/></svg>
+          </button>
+          <div class="drawflyout" id="eraseflyout">
+            <button class="rail" id="erasebtn" data-draw="eraseshape" title="erase: click a drawing to remove it">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21h10M5 13l6-6 7 7-5 5H8z"/><path d="M11 7l7 7"/></svg>
+            </button>
+            <button class="rail" id="cleardrawbtn" title="clear all drawings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l3 14h12l3-14M4 6h16"/><path d="M9.5 6V4h5v2"/><path d="M9 10l6 6M15 10l-6 6"/></svg>
+            </button>
+          </div>
+        </div>
+        <button class="rail" id="zoomrail" title="reset zoom">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16 16l4 4M9 11h4M11 9v4"/></svg>
+        </button>
+        <div class="drawgroup" id="crosshairgroup">
+          <button class="rail active" id="rulerrail" title="crosshair options: ruler line + hover readout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20" stroke-dasharray="2 2"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
+          </button>
+          <div class="drawflyout chmenu" id="crosshairflyout">
+            <button class="ch-item active" id="rulertog" title="ruler crosshair: dotted line across all plots on hover">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20" stroke-dasharray="2 2"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
+              <span class="ch-lab">Ruler crosshair</span>
+              <span class="ch-state"></span>
+            </button>
+            <button class="ch-item active" id="hovertog" title="hover readout: show price + time tooltip on hover (off = clean view for panning)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h10a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H9l-4 4v-4H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/><path d="M6 8h6M6 11h4"/></svg>
+              <span class="ch-lab">Hover readout</span>
+              <span class="ch-state"></span>
+            </button>
+          </div>
+        </div>
+        <button class="rail" id="eyerail" title="show/hide candles">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z"/><circle cx="12" cy="12" r="2.5"/><path class="eyeslash" d="M4 4l16 16" style="display:none"/></svg>
+        </button>
+        <button class="rail" id="lockrail" title="lock / unlock price scale (y mode)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        </button>
+        <span class="rail-sp"></span>
+        <button class="rail" id="trashrail" title="clear all indicators">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>
+        </button>
+      </div>
+      <div id="chartcol">
+        <div id="charthead">
+          <div class="chh-row chh-main">
+            <span class="chh-pair" id="chhPair">—</span>
+            <span class="chh-tf" id="chhTf">15m</span>
+            <span class="ohlc"><b>O</b> <i id="chhO">—</i></span>
+            <span class="ohlc"><b>L</b> <i id="chhL">—</i></span>
+            <span class="ohlc"><b>H</b> <i id="chhH">—</i></span>
+            <span class="ohlc"><b>C</b> <i id="chhC">—</i></span>
+          </div>
+          <div class="chh-row chh-vol">
+            <span class="chh-lbl">Volume</span>
+            <span class="chh-v up" id="chhVup">—</span>
+            <span class="chh-v" id="chhVmid">—</span>
+            <span class="chh-v down" id="chhVdn">—</span>
+          </div>
+        </div>
+        <div id="chart"></div>
+        <div id="overlaybar"></div>
+        <button id="ymodebtn" title="cycle y-axis: auto / manual / log">Y-A</button>
+        <div id="yzone" title="drag up = zoom out, down = zoom in (price axis only)"><span class="yhint">↕ price zoom</span></div>
+        <div id="subsplit" title="drag to resize the bottom subplot pane"><span class="sshint"></span></div>
+      </div>
+    </div>
+  </div>
+  <div id="splitter"></div>
+  <div id="right">
+    <button id="rightcollapse" title="collapse panel">›</button>
+    <div id="presetbar">
+      <span class="lbl">Preset</span>
+      <select id="presetsel" title="select a preset to apply"><option value="">— none —</option></select>
+      <button id="presetdelnew" class="pb-icon" title="delete selected preset">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>
+      </button>
+      <button id="presetsavenew" class="pb-save" title="save current chart as a preset">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        Save
+      </button>
+      <!-- legacy controls kept for existing handlers; hidden -->
+      <button id="presetapply" style="display:none"></button>
+      <button id="presetsave" style="display:none"></button>
+      <button id="presetdel" style="display:none"></button>
+    </div>
+    <div id="activepanel">
+      <div id="activehead">
+        <span class="caret">▾</span>
+        <span class="ttl">On chart</span>
+        <span class="count" id="activecount"></span>
+        <span class="sp"></span>
+        <button id="activeadd" title="add indicators">＋ Add</button>
+        <button id="indclear" title="remove all from chart">clear</button>
+      </div>
+      <div id="activelist"></div>
+    </div>
+    <div id="rsplit" title="drag to resize the On-chart list vs the Sidekick chat"><span class="rshint"></span></div>
+    <div class="skhead">
+      <span class="dot"></span>
+      <span class="ttl">Sidekick</span>
+      <span id="busydot" title="working…"></span>
+      <span class="sub">quant analyst</span>
+      <button id="newchatbtn" type="button" title="new chat — clear this conversation and start fresh">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button id="logsbtn" type="button" title="activity log — what the analyst is doing">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      </button>
+    </div>
+    <div id="log"></div>
+    <div id="logspanel">
+      <div id="logshead">
+        <span>Activity log</span>
+        <span id="logsmeta"></span>
+        <button id="logsclose" type="button" title="close">✕</button>
+      </div>
+      <div id="logsbody"></div>
+    </div>
+    <div id="inputbar">
+      <div id="acbox"></div>
+      <div id="promptcard">
+        <textarea id="input" rows="1" placeholder="What can I do for you?  (type \ for indicators, Enter to send, Shift+Enter for a newline)" autocomplete="off"></textarea>
+        <div id="promptfoot">
+          <div class="pf-left">
+            <div class="modelwrap" id="modelwrap">
+              <button class="modelbtn" id="modelbtn" type="button" title="select analyst model">
+                <span class="model-ic" id="modelic"></span>
+                <span class="model-name" id="modelname">model</span>
+                <svg class="model-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <div class="modelpop" id="modelpop"></div>
+              <select id="modelsel" style="display:none"></select>
+            </div>
+            <div class="pf-div"></div>
+            <label class="attachbtn" id="attachbtn" title="attach a file / indicator">
+              <input type="file" id="attachinput" hidden multiple/>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            </label>
+          </div>
+          <button id="send" type="button" title="send">
+            <svg class="send-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            <svg class="stop-ic" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- indicators modal: Favorites / Main plot / Sub-plots -->
+<div id="indmodal">
+  <div id="indcard">
+    <div id="indmhead">
+      <span class="ttl">Indicators</span>
+      <span class="count" id="indcount"></span>
+      <button id="indmclose" title="close">✕</button>
+    </div>
+    <div id="indsearchwrap"><input id="indsearch" placeholder="Search indicators…" autocomplete="off"/></div>
+    <div id="indtabs">
+      <button class="indtab" data-tab="fav">★ Favorites <span class="b" id="tabcount-fav">0</span></button>
+      <button class="indtab on" data-tab="main">Main plot <span class="b" id="tabcount-main">0</span></button>
+      <button class="indtab" data-tab="sub">Sub-plots <span class="b" id="tabcount-sub">0</span></button>
+    </div>
+    <div id="indlist"></div>
+  </div>
+</div>
+
+<div id="histmodal">
+  <div id="histcard">
+    <div id="histhead"><span>Past sessions</span><button id="histclose">✕</button></div>
+    <div id="histlist"></div>
+  </div>
+</div>
+
+<div id="btmodal">
+  <div id="btcard">
+    <div id="bthead"><span>Backtest a strategy</span><button id="btclose">✕</button></div>
+    <div id="btbody">
+      <div class="btcols">
+        <div class="btcol">
+          <div class="btsec">
+            <div class="btlabel">Strategy</div>
+            <select id="bt-strat"></select>
+          </div>
+          <div class="btsec">
+            <div class="btlabel">Pairs</div>
+            <div id="bt-pairs" class="pairchips"></div>
+          </div>
+        </div>
+        <div class="btcol">
+          <div class="btgrid">
+            <label>Timeframe<select id="bt-tf"><option>15m</option><option>30m</option><option>1h</option><option>2h</option><option>4h</option><option>1d</option></select></label>
+            <label>From<input type="date" id="bt-start"></label>
+            <label>To<input type="date" id="bt-end"></label>
+            <label>ROI % <span class="bthint">(blank=strat)</span><input type="number" id="bt-roi" placeholder="strategy" step="0.5" min="0"></label>
+            <label>Stoploss % <span class="bthint">(blank=strat)</span><input type="number" id="bt-sl" placeholder="strategy" step="0.5" min="0"></label>
+            <label>Max open<input type="number" id="bt-maxopen" placeholder="config" min="1"></label>
+            <label>Stake<input type="number" id="bt-stake" placeholder="config" min="0"></label>
+            <label class="ckl"><input type="checkbox" id="bt-trailing"> Trailing stop</label>
+            <label class="ckl"><input type="checkbox" id="bt-prot"> Protections</label>
+          </div>
+          <div class="btactions">
+            <button id="bt-run" class="bt-run">Run backtest</button>
+            <span id="bt-status" class="bt-status"></span>
+          </div>
+        </div>
+      </div>
+      <div id="bt-result" class="btresult"></div>
+      <div id="bt-past" class="btpast"></div>
+    </div>
+  </div>
+</div>
+<script>
+const API = "";
+let DATA = null;
+let COLS = {ohlcv:[], indicators:[]};
+let RANGES = {};             // name -> {bucket,min,max}
+let CUR_PAIR = null;
+let FULL_RANGE = null;
+let CUR_RANGE = null;
+const MAX_POINTS_CAP = 12000;   // hard ceiling so high-res TFs stay plottable
+let AUTOSCALE = true;        // back-compat flag (true when YMODE==="auto")
+let YMODE = "auto";          // "auto" | "manual" | "log"
+let SHOW_LEGEND = (localStorage.getItem("cs_legend")==="1");   // chart legend visibility (default off)
+let SHOW_PRICE = true;       // OHLC candlestick visibility (persists across slice reloads)
+let RULER = (localStorage.getItem("cs_ruler")!=="0"); // ruler crosshair spike on hover (default on)
+let HOVER = (localStorage.getItem("cs_hover")!=="0"); // per-point hover tooltips (price+time). off = clean view for panning
+// vertical split: paper-y where the price pane bottom / subplot stack top meet.
+// Dragging #subsplit changes it so the user can grow/shrink the bottom subplots.
+let SUBPLOT_SPLIT = (()=>{ const v=parseFloat(localStorage.getItem("cs_subsplit")); return (v>=0.15 && v<=0.85) ? v : 0.435; })();
+let MEASURE = false;         // measure-tool armed
+let MEASURE_A = null;        // first clicked point {x, y}
+let DRAW_MODE = null;        // null=pan | "drawopenpath"|"drawline"|"drawrect"|"eraseshape" — Plotly dragmode for drawing
+const DRAW_COLOR = "#22d3ee";// accent for user drawings (visible in the AI screenshot)
+const PAD_FRAC = 0.18;       // fetch this much extra data outside the view on each side
+let TF = "15m";              // selected display timeframe (resampled client-side from 15m base)
+let CANDLE_TYPE = "candles"; // "candles" | "heikin" | "hidden"
+const BASE_TF_MIN = 15;      // raw dump granularity (minutes)
+const TF_MIN = {"15m":15,"30m":30,"1h":60,"2h":120,"4h":240,"6h":360,"8h":480,"12h":720,"1d":1440};
+
+// ACTIVE: name -> {place:"overlay"|"sub:N", color:"#rrggbb"}
+const ACTIVE = new Map();
+let MARKERS = [];            // [{date, price, confirmed}] event markers from analysis
+let MARKER_LABEL = "";       // legend label for current markers
+let MARKER_GROUPS = [];      // [{label, markers:[...], color}] — REBUILT from OVERLAYS by syncOverlays()
+// ---- overlay registry: every "thing plotted on the chart" with provenance ----
+// each: {id, kind:"backtest"|"analysis", label, meta, pair, range:[start,end]|null,
+//        markers:[...], visible:true, color}
+let OVERLAYS = [];
+let _ovId = 0;
+const OV_COLORS = ["#7ee787","#79c0ff","#d2a8ff","#ffa657","#f778ba","#56d4dd"];
+function ovNextColor(){ return OV_COLORS[OVERLAYS.length % OV_COLORS.length]; }
+function addOverlay(o){
+  const ov = Object.assign({ id:++_ovId, visible:true, color:ovNextColor(), range:null, meta:"" }, o);
+  OVERLAYS.push(ov);
+  syncOverlays();
+  saveOverlays();
+  return ov;
+}
+function removeOverlay(id){ OVERLAYS = OVERLAYS.filter(o=>o.id!==id); syncOverlays(); saveOverlays(); }
+function toggleOverlay(id){ const o=OVERLAYS.find(x=>x.id===id); if(o){ o.visible=!o.visible; syncOverlays(); saveOverlays(); } }
+function clearOverlays(){ OVERLAYS=[]; syncOverlays(); saveOverlays(); }
+// ---- persistence: backtest overlays survive reload (analysis marks are transient) ----
+const OV_STORE_KEY="cs_overlays_v1";
+function saveOverlays(){
+  try{
+    const keep=OVERLAYS.filter(o=>o.kind==="backtest").map(o=>({
+      id:o.id, kind:o.kind, label:o.label, meta:o.meta, pair:o.pair,
+      range:o.range, markers:o.markers, visible:o.visible, color:o.color,
+      _runKey:o._runKey, _ts:o._ts,
+    }));
+    localStorage.setItem(OV_STORE_KEY, JSON.stringify(keep));
+  }catch(e){}
+}
+function loadOverlays(){
+  try{
+    const raw=localStorage.getItem(OV_STORE_KEY); if(!raw) return;
+    const arr=JSON.parse(raw); if(!Array.isArray(arr)) return;
+    OVERLAYS = arr.filter(o=>o&&o.markers&&o.markers.length);
+    _ovId = OVERLAYS.reduce((m,o)=>Math.max(m, o.id||0), 0);
+  }catch(e){ OVERLAYS=[]; }
+}
+// rebuild MARKER_GROUPS from visible overlays (for current pair) + redraw chart + chips
+function syncOverlays(){
+  const cur = (CUR_PAIR||"");
+  MARKER_GROUPS = OVERLAYS.filter(o=>o.visible && (!o.pair || o.pair===cur))
+    .map(o=>({label:o.label, markers:o.markers, color:o.color}));
+  if(typeof render==="function") render(true);
+  renderOverlayBar();
+}
+function renderOverlayBar(){
+  const bar=document.getElementById("overlaybar"); if(!bar) return;
+  bar.innerHTML="";
+  if(!OVERLAYS.length) return;
+  const lbl=document.createElement("span"); lbl.className="ovbar-lbl"; lbl.textContent="on chart";
+  bar.appendChild(lbl);
+  OVERLAYS.forEach(o=>{
+    const offPair = o.pair && o.pair!==(CUR_PAIR||"");
+    const chip=document.createElement("div");
+    chip.className="ovchip"+(o.visible?"":" off");
+    chip.style.borderLeftColor=o.color;
+    chip.title = o.visible ? "click: zoom to range  ·  eye: hide  ·  ✕: remove"
+                           : "hidden — click eye to show";
+    const meta = o.meta + (offPair ? "  · other pair" : "");
+    chip.innerHTML='<span class="ovdot" style="background:'+o.color+'"></span>'+
+      '<span class="ovlab">'+escHtml(o.label)+'</span>'+
+      (meta?'<span class="ovmeta">'+escHtml(meta)+'</span>':'')+
+      '<button class="ovtog" title="'+(o.visible?"hide":"show")+'">'+(o.visible?"👁":"🚫")+'</button>'+
+      '<button class="ovx" title="remove">✕</button>';
+    chip.querySelector(".ovtog").onclick=(e)=>{ e.stopPropagation(); toggleOverlay(o.id); };
+    chip.querySelector(".ovx").onclick=(e)=>{ e.stopPropagation(); removeOverlay(o.id); };
+    // clicking the chip body: show if hidden, then jump to its pair/range
+    chip.onclick=(e)=>{ if(e.target.closest("button")) return;
+      if(!o.visible){ toggleOverlay(o.id); }
+      if(offPair){ loadData(o.pair).then(()=>{ if(o.range) jumpRange(o.range[0],o.range[1]); syncOverlays(); }); }
+      else if(o.range){ jumpRange(o.range[0],o.range[1]); }
+    };
+    bar.appendChild(chip);
+  });
+  // overlay strip changes the chart column height; let Plotly re-fit.
+  try{ if(window.Plotly&&gd&&gd.data) Plotly.Plots.resize(gd); }catch(e){}
+}
+function escHtml(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+// zoom chart x-axis to [start,end] ISO/date strings and reload that slice
+function jumpRange(start,end){
+  if(!start&&!end) return;
+  const s=start?new Date(start).toISOString():null, e=end?new Date(end).toISOString():null;
+  if(s&&e){ Plotly.relayout(gd, {"xaxis.range":[s,e]}); }
+  reloadSlice(s,e);
+}
+const FAVS = new Set(JSON.parse(localStorage.getItem("cs_favs")||"[]"));
+let PRESETS = JSON.parse(localStorage.getItem("cs_presets")||"{}");
+let CUR_PRESET = "";   // name of the currently-applied preset (for /clear)
+
+const PALETTE = ["#58a6ff","#e3b341","#7ee787","#ff7b72","#d2a8ff","#ffa657","#79c0ff","#56d364","#f778ba","#a5d6ff","#ffdf5d","#bc8cff"];
+let colorIdx=0;
+function nextColor(){ const c=PALETTE[colorIdx%PALETTE.length]; colorIdx++; return c; }
+
+const gd = document.getElementById("chart");
+const logEl = document.getElementById("log");
+
+function addMsg(text, cls){
+  const d=document.createElement("div"); d.className="msg "+cls;
+  if(cls==="bot"){ d.innerHTML=mdRender(text); }
+  else { d.textContent=text; }
+  logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; return d;
+}
+function mdRender(t){
+  try {
+    let h = marked.parse(t||"", {breaks:true, gfm:true});
+    // wrap tables so wide ones scroll horizontally instead of crushing labels
+    h = h.replace(/<table>/g,'<div class="tblwrap"><table>').replace(/<\/table>/g,'</table></div>');
+    return h;
+  }
+  catch(e){ const e2=document.createElement("div"); e2.textContent=t||""; return e2.innerHTML; }
+}
+function setBot(el, text, model, elapsedMs){
+  let html = mdRender(text||"(no reply)");
+  if(model || elapsedMs!=null){
+    let body = "";
+    if(model) body += 'model <span class="mdl">'+model+'</span>';
+    if(elapsedMs!=null){ if(body) body+=' &nbsp;&middot;&nbsp; '; body += 'took <span class="mdl">'+fmtDur2(elapsedMs)+'</span>'; }
+    html += '<details class="meta"><summary>details</summary><div class="mbody">'+body+'</div></details>';
+  }
+  el.innerHTML = html;
+  logEl.scrollTop=logEl.scrollHeight;
+}
+// human-readable elapsed: ms < 1s, else s with 1 decimal under a minute, else m s
+function fmtDur2(ms){
+  if(ms==null) return "";
+  if(ms<1000) return Math.round(ms)+"ms";
+  const s=ms/1000;
+  if(s<60) return (s<10?s.toFixed(1):Math.round(s))+"s";
+  const m=Math.floor(s/60), rem=Math.round(s-m*60);
+  return m+"m "+rem+"s";
+}
+function setStatus(t){ document.getElementById("status").textContent=t; }
+function saveFavs(){ localStorage.setItem("cs_favs", JSON.stringify([...FAVS])); }
+function savePresets(){ localStorage.setItem("cs_presets", JSON.stringify(PRESETS)); }
+
+async function loadPairs(){
+  const r=await fetch(API+"/api/pairs"); const j=await r.json();
+  const sel=document.getElementById("pair");
+  sel.innerHTML=""; j.pairs.forEach(p=>{const o=document.createElement("option");o.value=p;o.textContent=p;sel.appendChild(o);});
+  CUR_PAIR=j.pairs[0]; sel.value=CUR_PAIR;
+}
+
+async function fetchData(pair, start, end){
+  // Server resamples to the selected TF first, then downsamples only if needed.
+  let u=API+"/api/data?pair="+encodeURIComponent(pair)+"&tf="+encodeURIComponent(TF)+"&max_points="+MAX_POINTS_CAP;
+  if(start) u+="&start="+encodeURIComponent(start);
+  if(end)   u+="&end="+encodeURIComponent(end);
+  return fetch(u).then(r=>r.json());
+}
+
+async function loadData(pair){
+  setStatus("loading "+pair+"…");
+  CUR_PAIR=pair; CUR_RANGE=null;
+  const psel=document.getElementById("pair"); if(psel && psel.value!==pair) psel.value=pair;
+  const [c,d,rg]=await Promise.all([
+    fetch(API+"/api/columns?pair="+pair).then(r=>r.json()),
+    fetchData(pair, null, null),
+    fetch(API+"/api/ranges?pair="+pair).then(r=>r.json()),
+  ]);
+  COLS=c; DATA=d; RANGES=rg;
+  FULL_RANGE=[DATA.date[0], DATA.date[DATA.date.length-1]];
+  setStatus(pair+"  "+DATA._n_total+" bars"+(DATA._downsampled?" (showing "+DATA.date.length+")":""));
+  buildIndPanel(); buildActive(); loadPresetSel();
+  syncOverlays();   // re-filter overlays for the new pair, rebuild MARKER_GROUPS, then render
+}
+
+/* ---------------- categorization ---------------- */
+const CATS = [
+  ["MATRIX",   ["matrix"]],
+  ["ROXY/RPXY",["roxy","rpxy","rxy"]],
+  ["Moving Avg",["ema","wma","sma","smma","kama","zlema","hma","tema","dema","_ma"]],
+  ["MID LINE", ["mid_line","midline"]],
+  ["Bands",    ["band","upper","lower","support","resist"]],
+  ["Momentum", ["rsi","macd","stoch","cci","mom","adx","atr","vfi","cmf","obv","mfi","willr"]],
+  ["Trend/Regime",["trend","regime","range","curios","f1","mln","green","red","dip","htf"]],
+  ["Other",    []],
+];
+function catOf(name){
+  const lo=name.toLowerCase();
+  for(const [cat,keys] of CATS){ if(keys.length===0) continue; if(keys.some(k=>lo.includes(k))) return cat; }
+  return "Other";
+}
+const COLLAPSED = new Set();
+let FAV_ONLY=false;
+
+/* modal tab: which group of indicators is shown ("fav" | "main" | "sub") */
+let IND_TAB = "main";
+function tabOf(name){ return (RANGES[name]||{}).bucket==="price" ? "main" : "sub"; }
+function indInTab(name){
+  if(IND_TAB==="fav") return FAVS.has(name);
+  return tabOf(name)===IND_TAB;
+}
+function updateTabCounts(){
+  let f=0,m=0,s=0;
+  COLS.indicators.forEach(n=>{ if(FAVS.has(n))f++; if(tabOf(n)==="main")m++; else s++; });
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.textContent=v; };
+  set("tabcount-fav",f); set("tabcount-main",m); set("tabcount-sub",s);
+}
+
+/* default placement for a freshly-shown indicator, by value bucket */
+function defaultPlace(name){
+  const b=(RANGES[name]||{}).bucket;
+  if(b==="price") return "overlay";
+  if(b==="0-100") return "sub:0";
+  if(b==="0-1")   return "sub:1";
+  return "sub:2";  // other
+}
+
+function buildIndPanel(){
+  const list=document.getElementById("indlist"); if(!list) return;
+  const q=document.getElementById("indsearch").value.trim().toLowerCase();
+  document.getElementById("indcount").textContent=
+    COLS.indicators.length+" total"+(FAVS.size?(" · "+FAVS.size+"★"):"")+(ACTIVE.size?(" · "+ACTIVE.size+" shown"):"");
+  updateTabCounts();
+  const groups={}; CATS.forEach(([c])=>groups[c]=[]);
+  COLS.indicators.forEach(n=>{
+    if(!indInTab(n)) return;
+    if(q && !n.toLowerCase().includes(q)) return;
+    groups[catOf(n)].push(n);
+  });
+  // Build the whole panel as one HTML string, then assign once. Much faster than
+  // per-chip createElement + per-node closures when there are 150+ indicators.
+  const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  let html="";
+  CATS.forEach(([cat])=>{
+    const items=groups[cat]; if(!items.length) return;
+    const collapsed=COLLAPSED.has(cat);
+    html+='<div class="cat'+(collapsed?" collapsed":"")+'">'+
+      '<div class="cat-h" data-cat="'+esc(cat)+'"><span class="arrow">▼</span>'+esc(cat)+' <span style="opacity:.6">('+items.length+')</span></div>'+
+      '<div class="chips">';
+    items.forEach(name=>{
+      const on=ACTIVE.has(name)?" on":"", fav=FAVS.has(name)?" fav":"";
+      html+='<div class="tchip'+on+'" data-name="'+esc(name)+'">'+
+        '<span class="star'+fav+'" data-star="'+esc(name)+'" title="favorite">★</span>'+
+        '<span>'+esc(name)+'</span></div>';
+    });
+    html+='</div></div>';
+  });
+  if(!html){
+    html='<div id="indempty">'+(IND_TAB==="fav"
+      ? "No favorites yet — tap ★ on any indicator to pin it here."
+      : (q ? ("No match for \""+esc(q)+"\".") : "Nothing in this group."))+'</div>';
+  }
+  list.innerHTML=html;
+}
+// Delegated handlers (bound once) so rebuilding innerHTML stays cheap.
+(function(){
+  const list=document.getElementById("indlist"); if(!list || list._deleg) return; list._deleg=true;
+  list.addEventListener("click",(e)=>{
+    const star=e.target.closest(".star");
+    if(star){ e.stopPropagation(); const name=star.dataset.star;
+      if(FAVS.has(name))FAVS.delete(name); else FAVS.add(name); saveFavs(); buildIndPanel(); return; }
+    const chip=e.target.closest(".tchip");
+    if(chip){ toggleIndicator(chip.dataset.name); return; }
+    const head=e.target.closest(".cat-h");
+    if(head){ const cat=head.dataset.cat;
+      if(COLLAPSED.has(cat))COLLAPSED.delete(cat); else COLLAPSED.add(cat); buildIndPanel(); }
+  });
+})();
+
+/* ---------------- active list (color + subplot per indicator) ------------- */
+function subplotKeys(){
+  // distinct sub:N currently used, sorted
+  const keys=new Set();
+  ACTIVE.forEach(cfg=>{ if(cfg.place.startsWith("sub:")) keys.add(cfg.place); });
+  return [...keys].sort();
+}
+function buildActive(){
+  const list=document.getElementById("activelist"); list.innerHTML="";
+  document.getElementById("activecount").textContent=ACTIVE.size?(ACTIVE.size+" shown"):"";
+  if(!ACTIVE.size){ list.innerHTML='<div class="sys" style="padding:8px">Empty chart — click <b>＋ Add</b> to plot indicators</div>'; return; }
+  // build placement options: overlay + sub:0..N + "new subplot"
+  const subs=subplotKeys();
+  const maxN = subs.length? Math.max(...subs.map(s=>+s.slice(4))) : -1;
+  [...ACTIVE.entries()].forEach(([name,cfg])=>{
+    const row=document.createElement("div"); row.className="arow";
+    const col=document.createElement("input"); col.type="color"; col.value=cfg.color;
+    col.oninput=()=>{ cfg.color=col.value; render(true); };
+    const nm=document.createElement("span"); nm.className="nm"; nm.textContent=name; nm.title=name;
+    const sel=document.createElement("select");
+    const opts=[["overlay","price"]];
+    for(let i=0;i<=maxN+1;i++) opts.push(["sub:"+i,"sub "+(i+1)]);
+    opts.push(["__new","+ new sub"]);
+    opts.forEach(([v,t])=>{ const o=document.createElement("option"); o.value=v; o.textContent=t; if(v===cfg.place)o.selected=true; sel.appendChild(o); });
+    sel.onchange=()=>{ cfg.place = sel.value==="__new" ? ("sub:"+(maxN+1)) : sel.value; render(true); buildActive(); };
+    const x=document.createElement("span"); x.className="x"; x.textContent="✕"; x.title="hide";
+    x.onclick=()=>{ ACTIVE.delete(name); render(true); buildActive(); buildIndPanel(); };
+    row.appendChild(col); row.appendChild(nm); row.appendChild(sel); row.appendChild(x);
+    list.appendChild(row);
+  });
+}
+
+function toggleIndicator(name){
+  if(ACTIVE.has(name)) ACTIVE.delete(name);
+  else ACTIVE.set(name, {place:defaultPlace(name), color:nextColor()});
+  render(true); buildActive(); buildIndPanel();
+}
+
+/* ---------------- timeframe resample + heikin-ashi (client-side) ---------- */
+// DATA is 15m base. Build the view series at the selected TF and candle type.
+// Resample: bucket consecutive base bars by floor(time / tfMs). OHLC aggregation
+// = open(first) high(max) low(min) close(last) volume(sum); indicators last-in-bucket.
+function viewData(){
+  if(!DATA) return null;
+  const tfm = TF_MIN[TF] || BASE_TF_MIN;
+  let V = DATA;
+  if(tfm > BASE_TF_MIN){
+    const tfMs = tfm*60*1000;
+    const idx={}, order=[];      // bucket -> row index into output
+    const n=DATA.date.length;
+    const cols=Object.keys(DATA).filter(k=>!k.startsWith("_"));
+    const out={}; cols.forEach(c=>out[c]=[]);
+    for(let i=0;i<n;i++){
+      const t=new Date(DATA.date[i]).getTime();
+      const b=Math.floor(t/tfMs);
+      let j=idx[b];
+      if(j==null){ j=order.length; idx[b]=j; order.push(b);
+        // start new bucket
+        for(const c of cols) out[c].push(DATA[c][i]);
+        out.date[j]=new Date(b*tfMs).toISOString().slice(0,19);
+        out.open[j]=DATA.open[i];
+      } else {
+        out.high[j]=Math.max(out.high[j], DATA.high[i]);
+        out.low[j] =Math.min(out.low[j],  DATA.low[i]);
+        out.close[j]=DATA.close[i];
+        if(DATA.volume) out.volume[j]=(out.volume[j]||0)+(DATA.volume[i]||0);
+        // indicators: last-in-bucket
+        for(const c of cols){ if(["date","open","high","low","close","volume"].includes(c)) continue; out[c][j]=DATA[c][i]; }
+      }
+    }
+    V=out;
+  }
+  if(CANDLE_TYPE==="heikin"){
+    V=heikinAshi(V);
+  }
+  return V;
+}
+// Heikin-Ashi: HA_close=(o+h+l+c)/4; HA_open=(prevHAopen+prevHAclose)/2;
+// HA_high=max(h,HAo,HAc); HA_low=min(l,HAo,HAc). Returns a shallow clone with
+// open/high/low/close overwritten; indicators untouched.
+function heikinAshi(V){
+  const n=V.close.length; if(!n) return V;
+  const o=new Array(n), h=new Array(n), l=new Array(n), c=new Array(n);
+  let pho=null, phc=null;
+  for(let i=0;i<n;i++){
+    const O=V.open[i],H=V.high[i],L=V.low[i],C=V.close[i];
+    const hc=(O+H+L+C)/4;
+    const ho=(pho==null)?((O+C)/2):((pho+phc)/2);
+    c[i]=hc; o[i]=ho; h[i]=Math.max(H,ho,hc); l[i]=Math.min(L,ho,hc);
+    pho=ho; phc=hc;
+  }
+  const out=Object.assign({},V); out.open=o; out.high=h; out.low=l; out.close=c;
+  return out;
+}
+
+/* ---------------- render with N subplots + autoscale ---------------------- */
+function render(preserveRange){
+  if(!DATA) return;
+  const V=viewData();
+  const x=V.date;
+  const subs=subplotKeys();            // e.g. ["sub:0","sub:1"]
+  const nSub=subs.length;
+  // axis id per sub key: y2,y3,... (y reserved for price)
+  const axisOf={}; subs.forEach((k,i)=>{ axisOf[k]="y"+(i+2); });
+
+  const traces=[];
+  if(CANDLE_TYPE==="line"){
+    traces.push({
+      type:"scatter", mode:"lines", x, y:V.close,
+      name:"price", xaxis:"x", yaxis:"y", visible: SHOW_PRICE ? true : "legendonly",
+      line:{width:1.5, color:"#79c0ff"},
+    });
+  } else {
+    traces.push({
+      type:"candlestick", x, open:V.open, high:V.high, low:V.low, close:V.close,
+      name:"price", xaxis:"x", yaxis:"y", visible: (SHOW_PRICE && CANDLE_TYPE!=="hidden") ? true : "legendonly",
+      increasing:{line:{color:"#26a69a"}, fillcolor:"rgba(38,166,154,0.9)"},
+      decreasing:{line:{color:"#e23636"}, fillcolor:"rgba(226,54,54,0.9)"},
+    });
+  }
+  ACTIVE.forEach((cfg,n)=>{
+    const ax = cfg.place==="overlay" ? "y" : axisOf[cfg.place];
+    traces.push({type:"scatter", mode:"lines", x, y:V[n], name:n, xaxis:"x", yaxis:ax, line:{width:1.3, color:cfg.color}});
+  });
+
+  // analysis event markers (on price axis) — visual confirmation of computed edges.
+  // Each group = one indicator/edge. We draw ENTRY (up triangle), the hypothetical
+  // EXIT after the hold (x), and a faint connector line so you can see the held
+  // trade. Confirmed-only entries are solid; unconfirmed are hollow/red.
+  // Legacy single-set support: wrap MARKERS into one group if no groups set.
+  let groups = MARKER_GROUPS;
+  if((!groups || !groups.length) && MARKERS.length){
+    groups = [{label:MARKER_LABEL||"events", markers:MARKERS}];
+  }
+  const GCOLORS=["#7ee787","#79c0ff","#d2a8ff","#ffa657","#f778ba","#56d4dd"];
+  if(groups && groups.length){
+    groups.forEach((g,gi)=>{
+      const ms=(g.markers||[]).filter(m=>m&&m.date&&m.price!=null);
+      if(!ms.length) return;
+      const col=g.color||GCOLORS[gi%GCOLORS.length];
+      const yes=ms.filter(m=>m.confirmed!==false);
+      const no =ms.filter(m=>m.confirmed===false);
+      // entries (confirmed)
+      if(yes.length) traces.push({type:"scatter", mode:"markers", x:yes.map(m=>m.date), y:yes.map(m=>m.price),
+        name:(g.label||"edge")+" entry ("+yes.length+")", xaxis:"x", yaxis:"y",
+        marker:{symbol:"triangle-up", size:11, color:col, line:{width:1, color:"#0d0d0d"}},
+        hovertext:yes.map(m=>"ENTRY "+m.date+(m.confirm_bars!=null?(" (confirmed +"+m.confirm_bars+"b)"):"")), hoverinfo:"text+y"});
+      // entries (unconfirmed)
+      if(no.length) traces.push({type:"scatter", mode:"markers", x:no.map(m=>m.date), y:no.map(m=>m.price),
+        name:(g.label||"edge")+" unconfirmed ("+no.length+")", xaxis:"x", yaxis:"y",
+        marker:{symbol:"triangle-down", size:9, color:"#ff7b72", line:{width:1, color:"#0d0d0d"}},
+        hovertext:no.map(m=>"UNCONFIRMED "+m.date), hoverinfo:"text+y"});
+      // hypothetical exits + connector (only for entries that have an exit point)
+      const wExit=ms.filter(m=>m.exit_date&&m.exit_price!=null);
+      if(wExit.length){
+        // connector line: entry -> exit, broken by nulls between trades
+        const cx=[], cy=[];
+        wExit.forEach(m=>{ cx.push(m.date, m.exit_date, null); cy.push(m.price, m.exit_price, null); });
+        traces.push({type:"scatter", mode:"lines", x:cx, y:cy,
+          name:(g.label||"edge")+" hold", xaxis:"x", yaxis:"y", showlegend:false,
+          line:{width:1, color:col, dash:"dot"}, opacity:0.5, hoverinfo:"skip"});
+        traces.push({type:"scatter", mode:"markers", x:wExit.map(m=>m.exit_date), y:wExit.map(m=>m.exit_price),
+          name:(g.label||"edge")+" exit ("+wExit.length+")", xaxis:"x", yaxis:"y",
+          marker:{symbol:"x", size:9, color:col, line:{width:1, color:"#0d0d0d"}},
+          hovertext:wExit.map(m=>"EXIT "+m.exit_date+(m.fwd_return_pct!=null?(" ("+m.fwd_return_pct+"%)"):"")), hoverinfo:"text+y"});
+      }
+    });
+  }
+
+  // vertical domain split: price gets top, subplots stack below
+  // ruler crosshair spike props (toggled by RULER). xspike spans ALL panes ("across"),
+  // yspike reaches each pane's own axis ("toaxis"). When off, spikes disabled.
+  const xSpike = RULER ? {showspikes:true, spikemode:"across", spikesnap:"cursor", spikedash:"dot", spikethickness:1, spikecolor:"rgba(160,180,210,0.55)"} : {showspikes:false};
+  const ySpike = RULER ? {showspikes:true, spikemode:"toaxis", spikesnap:"cursor", spikedash:"dot", spikethickness:1, spikecolor:"rgba(160,180,210,0.45)"} : {showspikes:false};
+  const layout={
+    dragmode: DRAW_MODE || "pan", showlegend:SHOW_LEGEND,
+    newshape:{line:{color:DRAW_COLOR, width:2}, fillcolor:"rgba(34,211,238,0.07)", opacity:1, _draw:true},
+    paper_bgcolor:"#0d0d0d", plot_bgcolor:"#0d0d0d", font:{color:"#dfe4ee", family:"'IBM Plex Mono', ui-monospace, monospace", size:11},
+    legend:{bgcolor:"rgba(20,20,20,0.6)", bordercolor:"#2e2e2e", borderwidth:1, font:{size:10}},
+    margin:{l:54,r:12,t:12,b:30},
+    xaxis:Object.assign({rangeslider:{visible:false}, gridcolor:"#222222", zerolinecolor:"#2e2e2e", domain:[0,1], anchor: nSub? ("y"+(nSub+1)) : "y"}, xSpike),
+    hovermode: HOVER ? "x" : false,
+  };
+  // preserve x zoom
+  const curX = (preserveRange && gd.layout && gd.layout.xaxis) ? gd.layout.xaxis.range : null;
+  if(curX) layout.xaxis.range=curX;
+  // preserve any active measure-tool shapes + user drawings across re-render
+  if(gd.layout){
+    const ms=(gd.layout.shapes||[]).filter(s=>s._meas);
+    // preserve measure labels + user arrow annotations across re-render
+    const ma=(gd.layout.annotations||[]).filter(s=>s._meas || s._arrow);
+    // user drawings = any shape that isn't a measure shape or a subplot divider
+    const dr=(gd.layout.shapes||[]).filter(s=>!s._meas && !s._div).map(s=>Object.assign({}, s, {_draw:true}));
+    const keep=ms.concat(dr);
+    if(keep.length) layout.shapes=keep;
+    if(ma.length) layout.annotations=ma;
+  }
+
+  if(nSub===0){
+    layout.yaxis=Object.assign({gridcolor:"#222222", zerolinecolor:"#2e2e2e", domain:[0,1]}, ySpike);
+    applyYRange(layout, "yaxis", preserveRange);
+  } else {
+    // domains: price gets the top; subplots sit below with a compact separator
+    // gap. Keep the gap small to preserve chart space, but tint it so the panes
+    // read as separate regions.
+    const priceTop=1.0, priceBot=SUBPLOT_SPLIT;
+    const mainGap=0.018;
+    const subTop=priceBot-mainGap;
+    layout.yaxis=Object.assign({gridcolor:"#222222", zerolinecolor:"#2e2e2e", domain:[priceBot, priceTop]}, ySpike);
+    applyYRange(layout, "yaxis", preserveRange);
+    const subGap=0.02, totalH=subTop-0.0, each=(totalH-(nSub-1)*subGap)/nSub;
+    // dividers: narrow color-grade shift from the normal chart bg into a
+    // slightly different shade. No hard line and no wasted blank spacer.
+    const dividers=[];
+    const addGapBand=(y0,y1)=>{
+      const steps=7, h=(y1-y0)/steps;
+      for(let j=0;j<steps;j++) dividers.push({
+        type:"rect", xref:"paper", yref:"paper", x0:0, x1:1, y0:y0+j*h, y1:y0+(j+1)*h,
+        fillcolor:"rgba(74,88,116,"+(0.006+j*0.006)+")", line:{width:0}, layer:"below", _div:true,
+      });
+    };
+    addGapBand(subTop, priceBot);
+    subs.forEach((k,i)=>{
+      const top = subTop - i*(each+subGap);
+      const bot = top - each;
+      const aid = "yaxis"+(i+2);
+      layout[aid]=Object.assign({gridcolor:"#222222", zerolinecolor:"#2e2e2e", domain:[Math.max(0,bot), top], title:{text:subTitle(k), font:{size:9}}}, ySpike);
+      applyYRange(layout, aid, preserveRange);
+      if(i>0) addGapBand(top, Math.min(1, top + subGap));
+    });
+    layout.shapes = (layout.shapes||[]).filter(s=>!s._div).concat(dividers);
+  }
+  Plotly.react(gd, traces, layout, {scrollZoom:false, displayModeBar:true, responsive:true})
+    .then(positionYZone).then(positionSplitter).then(()=>{ try{updateChartHead(null);}catch(e){} });
+}
+// Place the Y-axis zoom strip over the left edge of the price plot.
+function positionYZone(){
+  const fl = gd._fullLayout; if(!fl || !fl.yaxis) return;
+  const yz=document.getElementById("yzone"); if(!yz) return;
+  const left=document.getElementById("chartcol");
+  const cb=gd.getBoundingClientRect(), lb=left.getBoundingClientRect();
+  const ox=cb.left-lb.left, oy=cb.top-lb.top;
+  const xa=fl.xaxis, ya=fl.yaxis;
+  if(xa._offset==null || ya._offset==null) return;   // geometry not ready yet
+  const W=Math.max(34, Math.min(xa._offset, 60));   // cover the price-label gutter
+  yz.style.left=(ox + Math.max(0, xa._offset - W))+"px"; // sit ON the price scale, not inside the plot
+  yz.style.top =(oy + ya._offset)+"px";              // price y-axis top
+  yz.style.width=W+"px";
+  yz.style.height=ya._length+"px";                   // full price-plot height
+  yz.style.display="block";
+}
+// Place the horizontal resize handle on the gap between the price pane and the
+// subplot stack. Hidden when there are no subplots. Dragging it grows/shrinks
+// the bottom pane (see wireSplitter).
+function positionSplitter(){
+  const ss=document.getElementById("subsplit"); if(!ss) return;
+  const fl=gd._fullLayout;
+  // y2 only exists when there is at least one subplot.
+  if(!fl || !fl.yaxis2 || fl.yaxis2._offset==null){ ss.style.display="none"; return; }
+  const left=document.getElementById("chartcol");
+  const cb=gd.getBoundingClientRect(), lb=left.getBoundingClientRect();
+  const oy=cb.top-lb.top;
+  // boundary = bottom of the price axis = top of the gap band. Center the handle on it.
+  const priceBottomPx = fl.yaxis._offset + fl.yaxis._length;
+  ss.style.top=(oy + priceBottomPx - 4)+"px";
+  ss.style.display="block";
+}
+function subTitle(k){
+  // label subplot by dominant bucket of its members
+  const buckets={};
+  ACTIVE.forEach((cfg,n)=>{ if(cfg.place===k){ const b=(RANGES[n]||{}).bucket||"?"; buckets[b]=(buckets[b]||0)+1; } });
+  return Object.keys(buckets).sort((a,b)=>buckets[b]-buckets[a])[0]||"";
+}
+// y-axis mode: auto (autorange), manual (freeze current range), log (log scale + autorange)
+function applyYRange(layout, axKey, preserveRange){
+  layout[axKey] = layout[axKey] || {};
+  if(YMODE==="log"){
+    layout[axKey].type="log";
+    layout[axKey].autorange=true;
+    return;
+  }
+  layout[axKey].type="linear";
+  if(YMODE==="auto"){ layout[axKey].autorange=true; return; }
+  // manual: freeze whatever range that axis currently shows
+  const cur = gd.layout && gd.layout[axKey] && gd.layout[axKey].range;
+  if(cur && preserveRange){ layout[axKey].range=cur.slice(); layout[axKey].autorange=false; }
+  else layout[axKey].autorange=true;  // first paint -> autorange, user then locks
+}
+
+/* ---------------- presets ------------------------------------------------- */
+function snapshotConfig(){
+  const o={}; ACTIVE.forEach((cfg,n)=>{ o[n]={place:cfg.place, color:cfg.color}; }); return o;
+}
+function applyConfig(cfg){
+  ACTIVE.clear();
+  Object.entries(cfg||{}).forEach(([n,c])=>{ ACTIVE.set(n, {place:c.place||defaultPlace(n), color:c.color||nextColor()}); });
+  render(true); buildActive(); buildIndPanel();
+}
+function loadPresetSel(){
+  const sel=document.getElementById("presetsel");
+  sel.innerHTML='<option value="">—</option>';
+  Object.keys(PRESETS).sort().forEach(n=>{ const o=document.createElement("option"); o.value=n; o.textContent=n; sel.appendChild(o); });
+}
+document.getElementById("presetsave").onclick=()=>{
+  const name=prompt("preset name:"); if(!name) return;
+  PRESETS[name]=snapshotConfig(); savePresets(); loadPresetSel();
+  CUR_PRESET=name;
+  document.getElementById("presetsel").value=name; addMsg("saved preset \""+name+"\" ("+ACTIVE.size+" indicators)","sys");
+};
+document.getElementById("presetapply").onclick=()=>{
+  const n=document.getElementById("presetsel").value; if(!n||!PRESETS[n]) return;
+  CUR_PRESET=n;
+  applyConfig(PRESETS[n]); addMsg("applied preset \""+n+"\"","sys");
+};
+document.getElementById("presetdel").onclick=()=>{
+  const n=document.getElementById("presetsel").value; if(!n||!PRESETS[n]) return;
+  if(!confirm("delete preset \""+n+"\"?")) return;
+  if(CUR_PRESET===n) CUR_PRESET="";
+  delete PRESETS[n]; savePresets(); loadPresetSel(); addMsg("deleted preset \""+n+"\"","sys");
+};
+/* compact preset UI: dropdown auto-applies, one Save button, one delete icon */
+document.getElementById("presetsel").onchange=(e)=>{
+  const n=e.target.value; CUR_PRESET=(n&&PRESETS[n])?n:""; if(n && PRESETS[n]){ applyConfig(PRESETS[n]); addMsg("applied preset \""+n+"\"","sys"); }
+};
+document.getElementById("presetsavenew").onclick=()=>document.getElementById("presetsave").onclick();
+document.getElementById("presetdelnew").onclick=()=>document.getElementById("presetdel").onclick();
+
+/* ---------------- slash commands (typed in the chat box) ------------------ */
+/* /clear : remove all AI-added markers + user drawings, then restore whatever
+   indicators are in the currently-applied preset (empty set if no preset).  */
+function clearToPreset(){
+  // 1) drop analysis markers / overlays
+  clearOverlays();
+  MARKERS=[]; MARKER_LABEL="";
+  // 2) drop user drawings + arrow annotations (keep measure shapes + subplot dividers)
+  if(gd && gd.layout){
+    const keepShapes=(gd.layout.shapes||[]).filter(s=>s._meas||s._div);
+    const keepAnno=(gd.layout.annotations||[]).filter(a=>!a._arrow);
+    Plotly.relayout(gd,{shapes:keepShapes, annotations:keepAnno});
+  }
+  // 3) restore the preset's indicator set (or clear all if no preset active)
+  if(CUR_PRESET && PRESETS[CUR_PRESET]) applyConfig(PRESETS[CUR_PRESET]);
+  else { ACTIVE.clear(); render(true); buildActive(); buildIndPanel(); }
+  const tag = (CUR_PRESET && PRESETS[CUR_PRESET]) ? (" - kept preset \""+CUR_PRESET+"\"") : " - chart bare (no preset active)";
+  addMsg("Cleared all markers and drawings"+tag+".","sys");
+}
+const SLASH_CMDS=[
+  {cmd:"/clear", desc:"clear markers + drawings, keep preset", run:clearToPreset},
+];
+/* returns true if the text was a slash command (already handled, do not send to AI) */
+function runSlash(text){
+  const t=(text||"").trim();
+  const c=SLASH_CMDS.find(x=>x.cmd===t || t.startsWith(x.cmd+" "));
+  if(!c) return false;
+  c.run();
+  return true;
+}
+
+/* ---------------- zoom-aware reload --------------------------------------- */
+let zoomTimer=null;
+function onRelayout(ev){
+  if(!ev) return;
+  // arrow tool: Plotly just added a line shape — turn the newest user line into an arrow annotation
+  if(DRAW_MODE==="arrow" && gd.layout && Array.isArray(gd.layout.shapes)){
+    const lines=gd.layout.shapes.filter(s=>!s._meas && !s._div && s.type==="line");
+    if(lines.length){
+      const ln=lines[lines.length-1];
+      const keep=gd.layout.shapes.filter(s=>s!==ln);
+      const anns=(gd.layout.annotations||[]).slice();
+      anns.push({
+        x:ln.x1, y:ln.y1, ax:ln.x0, ay:ln.y0,
+        xref:ln.xref||"x", yref:ln.yref||"y", axref:ln.xref||"x", ayref:ln.yref||"y",
+        showarrow:true, arrowhead:3, arrowsize:1.4, arrowwidth:2, arrowcolor:DRAW_COLOR,
+        text:"", _arrow:true,
+      });
+      Plotly.relayout(gd,{shapes:keep, annotations:anns});
+      return;
+    }
+  }
+  if(ev["xaxis.autorange"]===true){ if(CUR_RANGE){ CUR_RANGE=null; reloadSlice(null,null); } return; }
+  const s=ev["xaxis.range[0]"], e=ev["xaxis.range[1]"];
+  if(s===undefined||e===undefined) return;
+  clearTimeout(zoomTimer);
+  zoomTimer=setTimeout(()=>reloadSlice(s,e), 250);
+}
+async function reloadSlice(s,e){
+  // Fetch a window wider than the visible range so price/indicators are not
+  // clipped at the view edges (TradingView-style: data exists just outside view).
+  let fs=s, fe=e;
+  if(s && e){
+    const t0=new Date(s).getTime(), t1=new Date(e).getTime();
+    if(isFinite(t0)&&isFinite(t1)&&t1>t0){
+      const pad=(t1-t0)*PAD_FRAC;
+      fs=new Date(t0-pad).toISOString();
+      fe=new Date(t1+pad).toISOString();
+    }
+  }
+  const fstart=fs?new Date(fs).toISOString():null, fend=fe?new Date(fe).toISOString():null;
+  setStatus("loading slice…");
+  const d=await fetchData(CUR_PAIR, fstart, fend);
+  DATA=d; CUR_RANGE=(s||e)?[s?new Date(s).toISOString():null, e?new Date(e).toISOString():null]:null;
+  setStatus(CUR_PAIR+"  "+DATA._n_total+" bars in view"+(DATA._downsampled?" (showing "+DATA.date.length+")":""));
+  render(true);  // render() preserves the current x-axis view ([s,e]), not the padded fetch range
+}
+
+/* ---------------- autoscale toggle ---------------------------------------- */
+function setYMode(mode){
+  YMODE = mode;
+  AUTOSCALE = (mode==="auto");  // keep back-compat flag in sync (sent to brain)
+  const b=document.getElementById("ymodebtn");
+  if(b){
+    b.textContent = {auto:"Y-A", manual:"Y-M", log:"Y-L"}[mode] || "Y-A";
+    b.classList.toggle("log", mode==="log");
+    b.title = {auto:"y-axis: auto (click to cycle)", manual:"y-axis: manual / frozen (click to cycle)", log:"y-axis: log (equal % spacing) (click to cycle)"}[mode];
+  }
+  render(true);
+}
+function setAutoscale(on){ setYMode(on ? "auto" : "manual"); }
+function cycleYMode(){
+  const order=["auto","manual","log"];
+  setYMode(order[(order.indexOf(YMODE)+1)%order.length]);
+}
+
+/* ---------------- brain ops ----------------------------------------------- */
+const OPS = {
+  set_pair: async (a)=>{ await loadData(a.pair); },
+  show_indicator: (a)=>{ if(!ACTIVE.has(a.name)) ACTIVE.set(a.name,{place:a.subplot!=null?("sub:"+a.subplot):defaultPlace(a.name), color:a.color||nextColor()}); render(true); buildActive(); buildIndPanel(); },
+  hide_indicator: (a)=>{ ACTIVE.delete(a.name); render(true); buildActive(); buildIndPanel(); },
+  hide_all_indicators: ()=>{ ACTIVE.clear(); render(true); buildActive(); buildIndPanel(); },
+  show_only: (a)=>{ ACTIVE.clear(); (a.names||[]).forEach(n=>ACTIVE.set(n,{place:defaultPlace(n),color:nextColor()})); render(true); buildActive(); buildIndPanel(); },
+  set_color: (a)=>{ const c=ACTIVE.get(a.name); if(c){ c.color=a.color; render(true); buildActive(); } },
+  set_subplot: (a)=>{ const c=ACTIVE.get(a.name); if(c){ c.place=a.place||("sub:"+a.subplot); render(true); buildActive(); } },
+  set_autoscale: (a)=>{ setAutoscale(!!a.on); },
+  set_ymode: (a)=>{ const m=(a.mode||"").toLowerCase(); if(["auto","manual","log"].includes(m)) setYMode(m); },
+  apply_preset: (a)=>{ if(PRESETS[a.name]) applyConfig(PRESETS[a.name]); },
+  save_preset: (a)=>{ if(a.name){ PRESETS[a.name]=snapshotConfig(); savePresets(); loadPresetSel(); } },
+  zoom: (a)=>{ Plotly.relayout(gd, {"xaxis.range":[a.start,a.end]}); reloadSlice(a.start,a.end); },
+  zoom_y: (a)=>{ Plotly.relayout(gd, {"yaxis.range":[a.min,a.max]}); },
+  jump_to_date: (a)=>{
+    if(!a.date) return;
+    const c=new Date(a.date).getTime(); if(!isFinite(c)) return;
+    const bars=Math.max(20, a.bars||200);
+    const half=bars*15*60*1000/2;                 // 15-min bars -> ms half-window
+    const s=new Date(c-half).toISOString(), e=new Date(c+half).toISOString();
+    Plotly.relayout(gd, {"xaxis.range":[s,e]}); reloadSlice(s,e);
+  },
+  request_screenshot: ()=>{},   // handled by the chat loop (re-screenshots + continues)
+  reset_zoom: ()=>{ Plotly.relayout(gd, {"xaxis.autorange":true,"yaxis.autorange":true}); reloadSlice(null,null); },
+  pan: (a)=>{
+    const xr=gd.layout.xaxis.range; if(!xr) return;
+    const t0=new Date(xr[0]).getTime(), t1=new Date(xr[1]).getTime(); const w=t1-t0; const dx=w*(a.fraction||0.5);
+    const ns=new Date(t0+dx).toISOString(), ne=new Date(t1+dx).toISOString();
+    Plotly.relayout(gd, {"xaxis.range":[ns,ne]}); reloadSlice(ns,ne);
+  },
+  mark: (a)=>{
+    // analysis markers -> registry overlay(s) on the current pair (so they get a provenance chip
+    // and coexist with backtest overlays instead of clobbering them).
+    OVERLAYS = OVERLAYS.filter(o=>o.kind!=="analysis");  // replace prior analysis marks
+    let groups;
+    if(a.groups && a.groups.length){
+      groups=a.groups.map(g=>({label:g.label||"edge",
+        markers:(g.markers||[]).filter(m=>m&&m.date&&m.price!=null)}));
+    } else {
+      groups=[{label:a.label||"events",
+        markers:(a.markers||[]).filter(m=>m&&m.date&&m.price!=null)}];
+    }
+    MARKERS=[]; MARKER_LABEL="";
+    groups.forEach(g=>{
+      if(!g.markers.length) return;
+      addOverlay({ kind:"analysis", label:g.label,
+        meta:uiPairDisplay(CUR_PAIR)+" · "+g.markers.length+" marks",
+        pair:CUR_PAIR, range:null, markers:g.markers });
+    });
+  },
+  clear_marks: ()=>{ MARKERS=[]; MARKER_LABEL="";
+    OVERLAYS=OVERLAYS.filter(o=>o.kind!=="analysis"); syncOverlays(); },
+};
+function markCount(a){
+  if(a&&a.groups) return a.groups.reduce((s,g)=>s+((g.markers||[]).length),0);
+  return (a&&a.markers||[]).length;
+}
+// friendly label + monochrome glyph for each op, shown as a chip after the reply
+const OP_LABELS = {
+  set_pair:            a=>["⇄","Switched to "+(a.pair||"?")],
+  show_indicator:      a=>["+","Showed "+(a.name||"")],
+  hide_indicator:      a=>["−","Hid "+(a.name||"")],
+  hide_all_indicators: ()=>["×","Cleared indicators"],
+  show_only:           a=>["◉","Only "+((a.names||[]).join(", ")||"selected")],
+  set_color:           a=>["◑","Recolored "+(a.name||"")],
+  set_subplot:         a=>["▤","Moved "+(a.name||"")],
+  set_autoscale:       a=>["↕","Y-axis "+(a.on?"auto":"manual")],
+  set_ymode:           a=>["↕","Y-axis "+(a.mode||"")],
+  apply_preset:        a=>["≣","Preset "+(a.name||"")],
+  save_preset:         a=>["≣","Saved "+(a.name||"")],
+  zoom:                a=>["⤢","Zoomed to range"],
+  zoom_y:              a=>["↕","Zoomed price scale"],
+  jump_to_date:        a=>["⌖","Jumped to "+(a.date||"")],
+  request_screenshot:  ()=>["◉","Looking at the chart…"],
+  reset_zoom:          ()=>["⟲","Reset zoom"],
+  pan:                 a=>["↔","Panned"],
+  mark:                a=>["⌖",markCount(a)+" markers placed"],
+  clear_marks:         ()=>["×","Cleared markers"],
+};
+async function runActions(actions){
+  const row=document.createElement("div"); row.className="acts";
+  logEl.appendChild(row);
+  for(const act of actions){
+    const fn=OPS[act.op];
+    const chip=document.createElement("span");
+    if(fn){
+      const f=OP_LABELS[act.op];
+      const pair=f?f(act.args||{}):["•",act.op];
+      chip.className="achip";
+      const g=document.createElement("span"); g.className="g"; g.textContent=pair[0];
+      const t=document.createElement("span"); t.textContent=pair[1];
+      chip.appendChild(g); chip.appendChild(t);
+      row.appendChild(chip);
+      logEl.scrollTop=logEl.scrollHeight;
+      await fn(act.args||{});
+    } else {
+      chip.className="achip unknown";
+      const g=document.createElement("span"); g.className="g"; g.textContent="?";
+      const t=document.createElement("span"); t.textContent=act.op;
+      chip.appendChild(g); chip.appendChild(t);
+      row.appendChild(chip);
+    }
+  }
+  if(!row.children.length) row.remove();
+  logEl.scrollTop=logEl.scrollHeight;
+}
+
+function chartState(){
+  const xr = gd.layout && gd.layout.xaxis ? gd.layout.xaxis.range : null;
+  const shown={}; ACTIVE.forEach((c,n)=>shown[n]={place:c.place,color:c.color});
+  return {
+    pair: CUR_PAIR, visible_x: xr, autoscale: AUTOSCALE,
+    shown, favorites:[...FAVS], presets:Object.keys(PRESETS),
+    n_bars: DATA?DATA._n_total:0,
+    date_min: FULL_RANGE?FULL_RANGE[0]:null, date_max: FULL_RANGE?FULL_RANGE[1]:null,
+    all_indicators: COLS.indicators,
+  };
+}
+
+/* Capture the current chart as a PNG and upload it so the AI can SEE it.
+   Returns the server-side file path, or null on failure (chat still works text-only). */
+async function captureChart(){
+  try{
+    const w=Math.min(1600, gd.clientWidth||1200), h=Math.min(900, gd.clientHeight||600);
+    const url=await Plotly.toImage(gd,{format:"png", width:w, height:h, scale:1});
+    const r=await fetch(API+"/api/screenshot",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({png_b64:url})});
+    const j=await r.json();
+    return j&&j.ok ? j.path : null;
+  }catch(e){ return null; }
+}
+
+/* Run ONE chat turn: post text + chart_state (+ screenshot path), poll for the
+   reply, render it, apply ops. Returns the result object (so the caller can see
+   if the AI asked to look again). */
+async function chatTurn(text, pend, shotPath){
+  const t0=performance.now();   // measure wall-clock to the rendered reply
+  const state=chartState();
+  if(shotPath) state.screenshot_path=shotPath;
+  const sel=document.getElementById("modelsel");
+  const chosen=(sel&&sel.value)||null;   // send model atomically so it can't race the /api/model POST
+  const r=await fetch(API+"/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({text, chart_state:state, model:chosen})});
+  const {id}=await r.json();
+  CUR_MID=id;                          // expose for the Stop button + live activity tail
+  startActivityTail(id, pend);
+  for(let i=0;i<2400;i++){            // up to 20 min (brain hard-caps each model call at 180s)
+    await new Promise(s=>setTimeout(s,500));
+    let res;
+    try{ res=await fetch(API+"/api/chat/result/"+id).then(x=>x.json()); }
+    catch(e){ continue; }             // transient (server restart) — keep waiting
+    if(res.ready){
+      stopActivityTail();
+      stopLoading(pend);
+      if(res.cancelled){ pend.classList.add("stopped"); }
+      setBot(pend, res.reply, res.model_used, performance.now()-t0);
+      if(res.actions&&res.actions.length) await runActions(res.actions);
+      CUR_MID=null;
+      return res;
+    }
+  }
+  stopActivityTail();
+  stopLoading(pend); pend.textContent="(timeout waiting for brain after 20 min)";
+  CUR_MID=null;
+  return null;
+}
+
+// the in-flight turn id, so the Stop button knows what to cancel
+let CUR_MID=null;
+async function stopCurrentTurn(){
+  if(!CUR_MID) return;
+  const id=CUR_MID;
+  try{ await fetch(API+"/api/chat/cancel/"+id,{method:"POST"}); }catch(e){}
+  // the poll loop will pick up the "(stopped by user)" result on its next tick
+}
+
+/* ---------- activity log: live tail of what the analyst (brain) is doing ---------- */
+let _actTimer=null, _actSince=0, _actMid=null, _actPend=null, _actSeen=[];
+function fmtTs(ts){ const d=new Date(ts*1000); return d.toLocaleTimeString([], {hour12:false}); }
+function metaStr(m){
+  if(!m||typeof m!=="object") return "";
+  const parts=[];
+  for(const k of Object.keys(m)){
+    let v=m[k];
+    if(v==null) continue;
+    parts.push(k+"="+(typeof v==="object"?JSON.stringify(v):v));
+  }
+  return parts.join("  ");
+}
+function logRowHTML(e){
+  const ph=(e.phase||"").replace(/[^a-z0-9_-]/gi,"");
+  const det=(e.detail||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  const ms=metaStr(e.meta).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  return '<div class="logrow ph-'+ph+'">'
+    +'<span class="lt-ts">'+fmtTs(e.ts)+'</span>'
+    +'<span class="lt-ph">'+ph+'</span>'
+    +'<span class="lt-de">'+det+(ms?('  <span class="lt-ms">'+ms+'</span>'):'')+'</span>'
+    +'</div>';
+}
+function renderActivity(events){
+  const body=document.getElementById("logsbody");
+  if(!_actSeen.length && !events.length){
+    body.innerHTML='<div id="logsempty">No activity yet. Ask the analyst something — phases, ops and subprocess timings will stream here.</div>';
+    return;
+  }
+  if(events.length){
+    const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 40;
+    const html=events.map(logRowHTML).join("");
+    if(document.getElementById("logsempty")) body.innerHTML="";
+    body.insertAdjacentHTML("beforeend", html);
+    if(atBottom) body.scrollTop=body.scrollHeight;
+  }
+}
+function pushInlineActivity(e){
+  // tiny live line under the loading spinner for the current turn
+  if(!_actPend) return;
+  const lt=_actPend.querySelector(".lt");
+  if(!lt) return;
+  let now=_actPend.querySelector(".act-now");
+  if(!now){ now=document.createElement("span"); now.className="act-now"; lt.parentElement.appendChild(now); }
+  now.textContent=(e.phase||"")+(e.detail?(" · "+e.detail):"");
+}
+async function pollActivity(){
+  try{
+    const q=new URLSearchParams({since:_actSince, limit:"200"});
+    if(_actMid) q.set("mid", _actMid);
+    const r=await fetch(API+"/api/activity?"+q.toString()).then(x=>x.json());
+    const evs=r.events||[];
+    if(evs.length){
+      _actSince=evs[evs.length-1].ts;
+      _actSeen.push(...evs);
+      if(document.body.classList.contains("logs-open")) renderActivity(evs);
+      pushInlineActivity(evs[evs.length-1]);
+    }
+  }catch(e){}
+}
+function startActivityTail(mid, pend){
+  _actMid=mid; _actPend=pend; _actSince=0; _actSeen=[];
+  document.getElementById("logsbtn").classList.add("live");
+  if(document.body.classList.contains("logs-open")) document.getElementById("logsbody").innerHTML="";
+  if(_actTimer) clearInterval(_actTimer);
+  pollActivity();
+  _actTimer=setInterval(pollActivity, 700);
+}
+function stopActivityTail(){
+  if(_actTimer){ clearInterval(_actTimer); _actTimer=null; }
+  pollActivity();                       // final flush
+  document.getElementById("logsbtn").classList.remove("live");
+  _actPend=null;
+}
+function openLogs(){
+  document.body.classList.add("logs-open");
+  document.getElementById("logspanel").classList.add("show");
+  const body=document.getElementById("logsbody");
+  body.innerHTML="";
+  if(_actSeen.length){ renderActivity(_actSeen); body.scrollTop=body.scrollHeight; return; }
+  // idle open with nothing in memory: pull recent history from the server ring buffer
+  renderActivity([]);
+  fetch(API+"/api/activity?since=0&limit=200").then(x=>x.json()).then(r=>{
+    const evs=r.events||[];
+    if(evs.length){ _actSeen.push(...evs); _actSince=evs[evs.length-1].ts; renderActivity(evs); body.scrollTop=body.scrollHeight; }
+  }).catch(()=>{});
+}
+function closeLogs(){
+  document.body.classList.remove("logs-open");
+  document.getElementById("logspanel").classList.remove("show");
+}
+document.getElementById("logsbtn").onclick=()=>{
+  if(document.body.classList.contains("logs-open")) closeLogs(); else openLogs();
+};
+document.getElementById("logsclose").onclick=closeLogs;
+
+async function newChat(){
+  if(document.getElementById("send").classList.contains("busy")){
+    addMsg("finish or stop the current turn before starting a new chat.","sys"); return;
+  }
+  if(!confirm("Start a new chat? This clears the current conversation (it's archived, not lost).")) return;
+  try{ await fetch(API+"/api/chat/new",{method:"POST"}); }catch(e){}
+  // wipe the on-screen transcript, close the logs panel, reset activity memory
+  closeLogs();
+  _actSeen=[]; _actSince=0; _actMid=null; _actPend=null;
+  logEl.innerHTML="";
+  addMsg("New chat started. Ask the analyst anything.","sys");
+}
+document.getElementById("newchatbtn").onclick=newChat;
+
+async function send(){
+  const inp=document.getElementById("input");
+  const text=inp.value.trim(); if(!text) return;
+  // intercept local slash commands (e.g. /clear) - handled client-side, never sent to the AI
+  if(text[0]==="/" && runSlash(text)){
+    inp.value=""; autogrow(); updateSendState(); addMsg(text,"user");
+    return;
+  }
+  inp.value=""; autogrow(); updateSendState(); addMsg(text,"user");
+  let done=false;
+  try{
+    let shot=await captureChart();               // the AI sees what you see
+    let pend=addMsg("","bot"); startLoading(pend);
+    let res=await chatTurn(text, pend, shot);
+    // re-look loop: if the AI asked for a fresh screenshot after its ops, grab one
+    // and continue the SAME investigation. Capped so it can't loop forever.
+    let look=res && wantsScreenshot(res.actions);
+    for(let hop=0; hop<3 && look; hop++){
+      await new Promise(s=>setTimeout(s,450));   // let the chart finish re-rendering
+      shot=await captureChart();
+      pend=addMsg("","bot"); startLoading(pend);
+      res=await chatTurn("(continue — here is the updated chart you asked to see)", pend, shot);
+      look=res && wantsScreenshot(res.actions);
+    }
+    done=true; return;
+  } finally {
+    setBusy(false);
+  }
+}
+function wantsScreenshot(actions){
+  return !!(actions && actions.some(a=>a && a.op==="request_screenshot"));
+}
+
+
+/* ---------- loading animation ---------- */
+const LOAD_MSGS=["thinking","reading the data","running the analysis","crunching numbers","checking the edge","scoring outcomes"];
+let _loadTimers=new WeakMap();
+function setBusy(on){
+  document.getElementById("busydot").classList.toggle("on",on);
+  const b=document.getElementById("send");
+  b.classList.toggle("busy",on);
+  // while busy the button becomes a STOP control, so keep it enabled+titled
+  if(on){ b.disabled=false; b.title="stop"; } else { b.title="send"; updateSendState(); }
+}
+function startLoading(el){
+  setBusy(true);
+  el.classList.remove("bot"); el.classList.add("bot");
+  let mi=0;
+  el.innerHTML='<div class="loading"><span class="dots"><i></i><i></i><i></i></span><span class="lt shimmer">'+LOAD_MSGS[0]+'…</span></div>';
+  logEl.scrollTop=logEl.scrollHeight;
+  const t0=Date.now();
+  const timer=setInterval(()=>{
+    mi=(mi+1)%LOAD_MSGS.length;
+    const secs=Math.floor((Date.now()-t0)/1000);
+    const lt=el.querySelector(".lt");
+    if(lt) lt.textContent=LOAD_MSGS[mi]+"… "+(secs>2?("("+secs+"s)"):"");
+  },1800);
+  _loadTimers.set(el,timer);
+}
+function stopLoading(el){
+  const t=_loadTimers.get(el); if(t){ clearInterval(t); _loadTimers.delete(el); }
+  setBusy(false);
+}
+
+document.getElementById("send").onclick=()=>{
+  // busy = this button is the Stop control; otherwise it sends.
+  if(document.getElementById("send").classList.contains("busy")){ stopCurrentTurn(); }
+  else { send(); }
+};
+
+/* ---------- textarea: autogrow + key handling + indicator autocomplete ---------- */
+const inputEl = document.getElementById("input");
+const acBox = document.getElementById("acbox");
+let acItems = [];      // [{name,cat}]
+let acSel = -1;
+let acStart = -1;      // index of the trigger char ('\' or '/') in the textarea value
+let acMode = "ind";    // "ind" = indicator (\), "slash" = command (/)
+
+function autogrow(){
+  inputEl.style.height="auto";
+  inputEl.style.height=Math.min(inputEl.scrollHeight,160)+"px";
+}
+inputEl.addEventListener("input",()=>{ autogrow(); updateAC(); updateSendState(); });
+
+function updateAC(){
+  const val=inputEl.value;
+  const pos=inputEl.selectionStart;
+  // slash command: '/' as the very first char of the input (whole box is the command)
+  if(val[0]==="/" && val.indexOf("\n")<0 && val.indexOf(" ")<0){
+    acMode="slash"; acStart=0;
+    const frag=val.slice(1,pos).toLowerCase();
+    acItems=SLASH_CMDS.filter(c=>c.cmd.slice(1).toLowerCase().startsWith(frag))
+                      .map(c=>({name:c.cmd, cat:c.desc}));
+    if(!acItems.length){ hideAC(); return; }
+    acSel=0; renderAC(); return;
+  }
+  // indicator autocomplete: find a '\' before cursor with no whitespace between it and cursor
+  acMode="ind";
+  let bs=-1;
+  for(let i=pos-1;i>=0;i--){
+    const ch=val[i];
+    if(ch==="\\"){ bs=i; break; }
+    if(ch===" "||ch==="\n"||ch==="\t"){ break; }
+  }
+  if(bs<0){ hideAC(); return; }
+  acStart=bs;
+  const frag=val.slice(bs+1,pos).toLowerCase();
+  const cols=(COLS&&COLS.indicators)?COLS.indicators:[];
+  acItems=cols.filter(n=>n.toLowerCase().includes(frag)).slice(0,40).map(n=>({name:n,cat:catOf(n)}));
+  if(!acItems.length){ hideAC(); return; }
+  acSel=0; renderAC();
+}
+function renderAC(){
+  acBox.innerHTML="";
+  acItems.forEach((it,i)=>{
+    const d=document.createElement("div");
+    d.className="acitem"+(i===acSel?" sel":"");
+    d.innerHTML="<span>"+it.name+"</span><span class='cat'>"+it.cat+"</span>";
+    d.onmousedown=(e)=>{ e.preventDefault(); pickAC(i); };
+    acBox.appendChild(d);
+  });
+  acBox.classList.add("show");
+  const sel=acBox.querySelector(".acitem.sel"); if(sel) sel.scrollIntoView({block:"nearest"});
+}
+function hideAC(){ acBox.classList.remove("show"); acItems=[]; acSel=-1; acStart=-1; }
+function pickAC(i){
+  if(i<0||i>=acItems.length) return;
+  const name=acItems[i].name;
+  if(acMode==="slash"){
+    // fill the whole box with the command; user presses Enter to run it
+    inputEl.value=name;
+    inputEl.setSelectionRange(name.length,name.length);
+    hideAC(); autogrow(); inputEl.focus(); return;
+  }
+  const val=inputEl.value;
+  const pos=inputEl.selectionStart;
+  const before=val.slice(0,acStart);          // drop the backslash too
+  const after=val.slice(pos);
+  const ins=name+" ";
+  inputEl.value=before+ins+after;
+  const np=before.length+ins.length;
+  inputEl.setSelectionRange(np,np);
+  hideAC(); autogrow(); inputEl.focus();
+}
+
+inputEl.addEventListener("keydown",e=>{
+  if(acBox.classList.contains("show") && acItems.length){
+    if(e.key==="ArrowDown"){ e.preventDefault(); acSel=(acSel+1)%acItems.length; renderAC(); return; }
+    if(e.key==="ArrowUp"){ e.preventDefault(); acSel=(acSel-1+acItems.length)%acItems.length; renderAC(); return; }
+    if(e.key==="Enter"||e.key==="Tab"){ e.preventDefault(); pickAC(acSel); return; }
+    if(e.key==="Escape"){ e.preventDefault(); hideAC(); return; }
+  }
+  if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); }
+});
+inputEl.addEventListener("blur",()=>setTimeout(hideAC,120));
+document.getElementById("pair").onchange=e=>loadData(e.target.value);
+document.getElementById("reload").onclick=()=>loadData(CUR_PAIR);
+document.getElementById("resetzoom").onclick=()=>{ Plotly.relayout(gd,{"xaxis.autorange":true,"yaxis.autorange":true}); reloadSlice(null,null); };
+document.getElementById("ymodebtn").onclick=()=>cycleYMode();
+document.getElementById("legendtoggle").onclick=()=>{
+  SHOW_LEGEND=!SHOW_LEGEND;
+  localStorage.setItem("cs_legend", SHOW_LEGEND?"1":"0");
+  document.getElementById("legendtoggle").classList.toggle("active",SHOW_LEGEND);
+  Plotly.relayout(gd,{showlegend:SHOW_LEGEND});
+};
+function setShowPrice(on){
+  SHOW_PRICE=on;
+  document.getElementById("pricetoggle").classList.toggle("active",on);
+  const er=document.getElementById("eyerail"); if(er){ er.classList.toggle("active",!on); const sl=er.querySelector(".eyeslash"); if(sl) sl.style.display=on?"none":""; }
+  render(true);
+}
+document.getElementById("pricetoggle").onclick=()=>setCandleType(CANDLE_TYPE==="hidden"?"candles":"hidden");
+function setMeasure(on){
+  MEASURE=on; MEASURE_A=null;
+  if(on && DRAW_MODE) setDraw(null);   // measuring and drawing are mutually exclusive
+  document.getElementById("measurebtn").classList.toggle("active",on);
+  document.querySelector('.rail[data-tool="cursor"]').classList.toggle("active",!on);
+  gd.style.cursor = on ? "crosshair" : "";
+  if(!on) clearMeasure();
+}
+document.getElementById("measurebtn").onclick=()=>setMeasure(!MEASURE);
+
+/* ---- drawing tools (Plotly native shapes; survive pan/zoom + appear in the AI screenshot) ---- */
+// arrow uses Plotly's drawline dragmode, then onRelayout converts the line into an arrow annotation.
+const DRAW_BTNS={drawopenpath:"drawpenbtn", drawline:"drawlinebtn", arrow:"drawarrowbtn", drawrect:"drawrectbtn", drawcircle:"drawcirclebtn", eraseshape:"erasebtn"};
+const SHAPE_TOOLS=["drawopenpath","drawline","arrow","drawrect","drawcircle"]; // shown under the draw trigger
+const DRAW_ICONS={
+  drawopenpath:'<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  drawline:'<path d="M4 20L20 4"/><circle cx="4" cy="20" r="1.6" fill="currentColor" stroke="none"/><circle cx="20" cy="4" r="1.6" fill="currentColor" stroke="none"/>',
+  arrow:'<path d="M5 19L19 5"/><path d="M11 5h8v8"/>',
+  drawrect:'<rect x="4" y="6" width="16" height="12" rx="1"/>',
+  drawcircle:'<circle cx="12" cy="12" r="8"/>',
+};
+function setDraw(mode){
+  // toggle off if same tool clicked again
+  if(DRAW_MODE===mode) mode=null;
+  DRAW_MODE=mode;
+  if(mode) setMeasure(false);           // drawing and measuring are mutually exclusive
+  Object.values(DRAW_BTNS).forEach(id=>{ const b=document.getElementById(id); if(b) b.classList.remove("active"); });
+  if(mode){ const b=document.getElementById(DRAW_BTNS[mode]); if(b) b.classList.add("active"); }
+  // draw trigger: lights + swaps icon only for shape tools; erase trigger lights for eraser
+  const trig=document.getElementById("drawbtn"), ico=document.getElementById("drawbtnico");
+  const isShape = SHAPE_TOOLS.includes(mode);
+  if(trig) trig.classList.toggle("active", isShape);
+  if(ico && isShape && DRAW_ICONS[mode]) ico.innerHTML=DRAW_ICONS[mode];
+  const etrig=document.getElementById("erasergroupbtn");
+  if(etrig) etrig.classList.toggle("active", mode==="eraseshape");
+  document.querySelector('.rail[data-tool="cursor"]').classList.toggle("active", !mode && !MEASURE);
+  gd.style.cursor = mode ? "crosshair" : "";
+  if(isShape) _lastDrawTool=mode;
+  // arrow is drawn as a line; everything else maps 1:1 to a Plotly dragmode
+  const dm = mode==="arrow" ? "drawline" : (mode || "pan");
+  try{ Plotly.relayout(gd,{dragmode: dm}); }catch(e){}
+}
+document.getElementById("drawpenbtn").onclick =()=>setDraw("drawopenpath");
+document.getElementById("drawlinebtn").onclick=()=>setDraw("drawline");
+document.getElementById("drawarrowbtn").onclick=()=>setDraw("arrow");
+document.getElementById("drawrectbtn").onclick=()=>setDraw("drawrect");
+document.getElementById("drawcirclebtn").onclick=()=>setDraw("drawcircle");
+document.getElementById("erasebtn").onclick   =()=>setDraw("eraseshape");
+document.getElementById("cleardrawbtn").onclick=()=>{
+  const keep=(gd.layout&&gd.layout.shapes||[]).filter(s=>s._meas||s._div); // drop user drawings only
+  const akeep=(gd.layout&&gd.layout.annotations||[]).filter(a=>!a._arrow);
+  Plotly.relayout(gd,{shapes:keep, annotations:akeep});
+  setDraw(null);
+};
+// clicking a group trigger arms that group's default tool (draw=last shape, erase=eraser)
+document.getElementById("drawbtn").onclick=()=>setDraw(SHAPE_TOOLS.includes(DRAW_MODE) ? DRAW_MODE : (_lastDrawTool || "drawopenpath"));
+document.getElementById("erasergroupbtn").onclick=()=>setDraw("eraseshape");
+let _lastDrawTool="drawopenpath";
+
+/* ---- left rail extra tools + top-bar icons ---- */
+document.querySelector('.rail[data-tool="cursor"]').onclick=()=>{ if(DRAW_MODE) setDraw(null); else setMeasure(false); };
+document.getElementById("zoomrail").onclick=()=>{ Plotly.relayout(gd,{"xaxis.autorange":true,"yaxis.autorange":true}); reloadSlice(null,null); };
+document.getElementById("eyerail").onclick=()=>setCandleType(CANDLE_TYPE==="hidden"?"candles":"hidden");
+document.getElementById("lockrail").onclick=()=>cycleYMode();
+function syncCrosshairRail(){
+  // trigger rail shows active if either option is on
+  document.getElementById("rulerrail").classList.toggle("active", RULER || HOVER);
+  document.getElementById("rulertog").classList.toggle("active", RULER);
+  document.getElementById("hovertog").classList.toggle("active", HOVER);
+}
+document.getElementById("rulertog").onclick=(e)=>{
+  e.stopPropagation();
+  RULER=!RULER; localStorage.setItem("cs_ruler", RULER?"1":"0");
+  syncCrosshairRail();
+  render(true);
+};
+document.getElementById("hovertog").onclick=(e)=>{
+  e.stopPropagation();
+  HOVER=!HOVER; localStorage.setItem("cs_hover", HOVER?"1":"0");
+  syncCrosshairRail();
+  // instant toggle, no full re-render needed
+  Plotly.relayout(gd, {hovermode: HOVER ? "x" : false});
+};
+// click the trigger to pin/unpin the flyout (also opens on hover via CSS)
+document.getElementById("rulerrail").onclick=(e)=>{
+  e.stopPropagation();
+  document.getElementById("crosshairflyout").classList.toggle("pin");
+};
+document.addEventListener("click",(e)=>{
+  if(!document.getElementById("crosshairgroup").contains(e.target))
+    document.getElementById("crosshairflyout").classList.remove("pin");
+});
+document.getElementById("trashrail").onclick=()=>{ ACTIVE.clear(); render(true); buildActive(); buildIndPanel(); };
+document.getElementById("snapbtn").onclick=()=>{
+  Plotly.downloadImage(gd,{format:"png",filename:(CUR_PAIR||"chart")+"_"+TF,scale:2,
+    width:gd.clientWidth,height:gd.clientHeight});
+};
+/* timeframe dropdown (resampled client-side from the 15m base) */
+function setTF(tf){
+  if(!TF_MIN[tf]) return;
+  TF = tf;
+  document.getElementById("tfsel").value = tf;
+  const e=document.getElementById("chhTf"); if(e) e.textContent=tf;
+  // refetch at TF-matched server resolution, preserving current view window
+  const cur = (typeof CUR_RANGE!=="undefined" && CUR_RANGE) ? CUR_RANGE : [null,null];
+  reloadSlice(cur[0], cur[1]).then(()=>updateChartHead(null));
+}
+document.getElementById("tfsel").onchange=e=>setTF(e.target.value);
+/* candle type: candles / heikin-ashi / hidden */
+function setCandleType(ct){
+  CANDLE_TYPE = ct;
+  SHOW_PRICE = (ct!=="hidden");
+  document.querySelectorAll(".cp-item").forEach(b=>b.classList.toggle("active", b.dataset.ct===ct));
+  document.getElementById("pricetoggle").classList.toggle("active", ct!=="hidden");
+  const er=document.getElementById("eyerail"); if(er){ er.classList.toggle("active", ct==="hidden"); const sl=er.querySelector(".eyeslash"); if(sl) sl.style.display=(ct==="hidden")?"":"none"; }
+  render(true);
+}
+const candlePop=document.getElementById("candlepop");
+document.getElementById("candlemenu").onclick=(e)=>{ e.stopPropagation(); candlePop.classList.toggle("show"); };
+document.querySelectorAll(".cp-item").forEach(b=>{ b.onclick=()=>{ setCandleType(b.dataset.ct); candlePop.classList.remove("show"); }; });
+document.addEventListener("click",(e)=>{ if(!document.getElementById("candlewrap").contains(e.target)) candlePop.classList.remove("show"); });
+/* chart header OHLC: fill from latest bar on data load */
+function updateChartHead(i){
+  if(!DATA||!DATA.open) return;
+  const V=viewData(); if(!V||!V.open) return;
+  const n=V.open.length; if(i==null||i<0||i>=n) i=n-1;
+  const f=v=>{ if(v==null) return "—"; const a=Math.abs(v); return a>=1?v.toFixed(2):a>=0.01?v.toFixed(4):v.toPrecision(4); };
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.textContent=v; };
+  set("chhPair",(CUR_PAIR||"—")); set("chhTf",TF);
+  set("chhO",f(V.open[i])); set("chhH",f(V.high[i])); set("chhL",f(V.low[i])); set("chhC",f(V.close[i]));
+  const up=V.close[i]>=V.open[i];
+  document.querySelectorAll("#charthead .ohlc i").forEach(el=>el.style.color=up?"var(--up)":"var(--down)");
+  if(V.volume){ const v=V.volume[i];
+    set("chhVup", up?f(v):"—"); set("chhVmid", f(v)); set("chhVdn", up?"—":f(v)); }
+}
+gd.addEventListener("mousemove",ev=>{
+  try{ const fl=gd._fullLayout; if(!fl||!fl.xaxis||!DATA||!DATA.date) return;
+    const V=viewData(); if(!V||!V.date) return;
+    const bb=gd.getBoundingClientRect(); const px=ev.clientX-bb.left-fl.xaxis._offset;
+    const xv=fl.xaxis.p2d(px); const t=new Date(xv).getTime();
+    let best=-1,bd=1e18; for(let k=0;k<V.date.length;k++){ const d=Math.abs(new Date(V.date[k]).getTime()-t); if(d<bd){bd=d;best=k;} }
+    if(best>=0) updateChartHead(best);
+  }catch(e){}
+});
+
+/* ---------- session history ---------- */
+function fmtTs(ts){ try{ return new Date(ts*1000).toLocaleString(); }catch(e){ return ""; } }
+async function openHistory(){
+  const modal=document.getElementById("histmodal");
+  const list=document.getElementById("histlist");
+  list.innerHTML='<div class="sys">loading…</div>';
+  modal.classList.add("show");
+  let sessions=[];
+  try{ sessions=(await fetch(API+"/api/history").then(r=>r.json())).sessions||[]; }
+  catch(e){ list.innerHTML='<div class="sys">history unavailable</div>'; return; }
+  if(!sessions.length){ list.innerHTML='<div class="sys">no past sessions yet</div>'; return; }
+  list.innerHTML="";
+  sessions.forEach(s=>{
+    const nMarks=(s.actions||[]).reduce((a,act)=>a+(act.op==="mark"?markCount(act.args):0),0);
+    const row=document.createElement("div"); row.className="hrow";
+    const q=document.createElement("div"); q.className="hq"; q.textContent=s.text||"(empty)";
+    const meta=document.createElement("div"); meta.className="hmeta";
+    meta.innerHTML='<span>'+fmtTs(s.ts)+'</span><span class="mdl">'+(s.model||"?")+'</span>'+
+                   (nMarks?('<span>'+nMarks+' markers</span>'):'')+
+                   ((s.actions&&s.actions.length)?('<span>'+s.actions.length+' actions</span>'):'');
+    const ans=document.createElement("div"); ans.className="ha"; ans.innerHTML=mdRender(s.reply||"");
+    const btns=document.createElement("div"); btns.className="hbtns";
+    const view=document.createElement("button"); view.textContent="view answer";
+    view.onclick=()=>row.classList.toggle("open");
+    const resume=document.createElement("button"); resume.className="resume"; resume.textContent="resume";
+    resume.onclick=()=>resumeSession(s);
+    const del=document.createElement("button"); del.className="hdel"; del.textContent="delete"; del.title="delete this chat";
+    del.onclick=async()=>{
+      if(!s.id){ row.remove(); return; }
+      del.disabled=true; del.textContent="…";
+      try{
+        const r=await fetch(API+"/api/history/"+encodeURIComponent(s.id),{method:"DELETE"});
+        if(r.ok){ row.remove(); if(!list.children.length) list.innerHTML='<div class="sys">no past sessions yet</div>'; }
+        else { del.disabled=false; del.textContent="delete"; }
+      }catch(e){ del.disabled=false; del.textContent="delete"; }
+    };
+    btns.appendChild(view); btns.appendChild(resume); btns.appendChild(del);
+    row.appendChild(q); row.appendChild(meta); row.appendChild(ans); row.appendChild(btns);
+    list.appendChild(row);
+  });
+}
+async function resumeSession(s){
+  document.getElementById("histmodal").classList.remove("show");
+  addMsg(s.text||"(empty)","user");
+  setBot(addMsg("…","bot"), s.reply, s.model);
+  if(s.actions&&s.actions.length) await runActions(s.actions);
+}
+document.getElementById("histbtn").onclick=openHistory;
+document.getElementById("histclose").onclick=()=>document.getElementById("histmodal").classList.remove("show");
+document.getElementById("histmodal").onclick=(e)=>{ if(e.target.id==="histmodal") e.currentTarget.classList.remove("show"); };
+
+/* ---------- backtest (run an existing strategy) ---------- */
+let BT_PAIRS=[];          // selected pairs
+let BT_POLL=null;
+let BT_LAST=null;         // last result (for plotting markers)
+let BT_STRATS=null;       // cached strategy list
+async function loadStrategies(){
+  if(BT_STRATS) return BT_STRATS;
+  try{ BT_STRATS=(await fetch(API+"/api/strategies").then(r=>r.json())).strategies||[]; }
+  catch(e){ BT_STRATS=[]; }
+  return BT_STRATS;
+}
+function buildPairChips(){
+  const box=document.getElementById("bt-pairs"); box.innerHTML="";
+  const opts=[...document.getElementById("pair").options].map(o=>o.value);
+  if(!BT_PAIRS.length) BT_PAIRS=[CUR_PAIR||opts[0]];
+  opts.forEach(p=>{
+    const ch=document.createElement("div");
+    ch.className="chip"+(BT_PAIRS.includes(p)?" on":""); ch.textContent=p.replace(/_/g,"/");
+    ch.onclick=()=>{ if(BT_PAIRS.includes(p)) BT_PAIRS=BT_PAIRS.filter(x=>x!==p); else BT_PAIRS.push(p);
+      ch.classList.toggle("on"); };
+    box.appendChild(ch);
+  });
+}
+async function openBacktest(){
+  const m=document.getElementById("btmodal");
+  const sel=document.getElementById("bt-strat");
+  sel.innerHTML='<option value="">loading…</option>';
+  m.classList.add("show");
+  const strats=await loadStrategies();
+  sel.innerHTML=strats.length
+    ? strats.map(s=>'<option>'+s+'</option>').join("")
+    : '<option value="">(no strategies found)</option>';
+  document.getElementById("bt-tf").value=TF||"15m";
+  if(FULL_RANGE){
+    document.getElementById("bt-start").value=(FULL_RANGE[0]||"").slice(0,10);
+    document.getElementById("bt-end").value=(FULL_RANGE[1]||"").slice(0,10);
+  }
+  BT_PAIRS=[CUR_PAIR]; buildPairChips();
+  document.getElementById("bt-result").classList.remove("show");
+  document.getElementById("bt-status").textContent="";
+  renderPastBacktests();
+}
+function closeBacktest(){ document.getElementById("btmodal").classList.remove("show"); if(BT_POLL){clearInterval(BT_POLL);BT_POLL=null;} }
+document.getElementById("btbtn").onclick=openBacktest;
+document.getElementById("btclose").onclick=closeBacktest;
+document.getElementById("btmodal").onclick=(e)=>{ if(e.target.id==="btmodal") closeBacktest(); };
+
+function btSetStatus(t, err){
+  const el=document.getElementById("bt-status"); el.textContent=t; el.classList.toggle("err", !!err);
+}
+async function runBacktest(){
+  const strat=document.getElementById("bt-strat").value;
+  if(!strat){ btSetStatus("pick a strategy", true); return; }
+  const roi=parseFloat(document.getElementById("bt-roi").value);
+  const sl=parseFloat(document.getElementById("bt-sl").value);
+  const maxopen=document.getElementById("bt-maxopen").value;
+  const stake=document.getElementById("bt-stake").value;
+  const spec={
+    strategy: strat,
+    pairs: BT_PAIRS.slice(),
+    minimal_roi: (!isNaN(roi)&&roi>0?{"0":roi/100}:null),   // blank = use strategy's own ROI
+    stoploss: (!isNaN(sl)&&sl>0? -(Math.abs(sl)/100) : null), // blank = use strategy's own SL
+    trailing_stop: document.getElementById("bt-trailing").checked,
+    enable_protections: document.getElementById("bt-prot").checked,
+    timeframe: document.getElementById("bt-tf").value,
+    start: document.getElementById("bt-start").value||null,
+    end: document.getElementById("bt-end").value||null,
+    max_open_trades: maxopen?parseInt(maxopen):null,
+    stake_amount: stake?parseFloat(stake):null,
+  };
+  if(!spec.pairs.length){ btSetStatus("pick at least one pair", true); return; }
+  const btn=document.getElementById("bt-run"); btn.disabled=true;
+  btSetStatus("submitting…");
+  let job;
+  try{
+    const r=await fetch(API+"/api/backtest",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(spec)});
+    const j=await r.json();
+    if(!r.ok || j.ok===false){ btSetStatus(j.error||("error "+r.status), true); btn.disabled=false; return; }
+    job=j.job_id;
+  }catch(e){ btSetStatus("request failed: "+e, true); btn.disabled=false; return; }
+  const t0=Date.now();
+  BT_POLL=setInterval(async()=>{
+    let s;
+    try{ s=await fetch(API+"/api/backtest/"+job).then(r=>r.json()); }catch(e){ return; }
+    const secs=((Date.now()-t0)/1000).toFixed(0);
+    if(s.status==="running"||s.status==="queued"){ btSetStatus("running "+s.status+"… "+secs+"s"); return; }
+    clearInterval(BT_POLL); BT_POLL=null; btn.disabled=false;
+    if(s.status==="error"){ btSetStatus("failed: "+(s.error||"unknown"), true); return; }
+    btSetStatus("done in "+secs+"s"); renderBtResult(s.result, spec);
+    // auto-plot on the chart with provenance (no extra click needed)
+    const tr=(s.result&&s.result.trades)||[];
+    if(tr.length) plotBtTrades(tr, spec);
+  }, 1500);
+}
+document.getElementById("bt-run").onclick=runBacktest;
+
+function statEl(k,v,cls){ return '<div class="btstat"><div class="v '+(cls||"")+'">'+v+'</div><div class="k">'+k+'</div></div>'; }
+function renderBtResult(res, spec){
+  BT_LAST={res, spec};
+  const box=document.getElementById("bt-result"); box.classList.add("show");
+  const s=res.summary||{}; const trades=res.trades||[];
+  const pnl=s.profit_total_pct; const pcls=pnl>0?"pos":(pnl<0?"neg":"");
+  let html='<div class="btstats">'+
+    statEl("trades", s.total_trades??trades.length)+
+    statEl("win rate", (s.win_rate_pct!=null?s.win_rate_pct+"%":"—"))+
+    statEl("total P&L", (pnl!=null?(pnl>0?"+":"")+pnl+"%":"—"), pcls)+
+    statEl("avg P&L", (s.avg_profit_pct!=null?s.avg_profit_pct+"%":"—"))+
+    statEl("max DD", (s.max_drawdown_pct!=null?s.max_drawdown_pct+"%":"—"),"neg")+
+    statEl("W / L", (s.wins??"?")+" / "+(s.losses??"?"))+
+    '</div>';
+  if(trades.length){
+    html+='<div class="bttrades"><table><thead><tr><th>#</th><th>pair</th><th>side</th><th>entry</th><th>exit</th><th>P&L%</th><th>reason</th></tr></thead><tbody>';
+    trades.slice(0,500).forEach((t,i)=>{
+      const p=t.profit_pct!=null?t.profit_pct:(t.profit_ratio!=null?+(t.profit_ratio*100).toFixed(2):null);
+      const pc=p>0?"pos":(p<0?"neg":"");
+      html+='<tr><td>'+(i+1)+'</td><td>'+(t.pair||"")+'</td><td>'+(t.is_short?"short":"long")+'</td>'+
+        '<td>'+(t.open_date||"").replace("T"," ").slice(0,16)+'</td>'+
+        '<td>'+(t.close_date||"").replace("T"," ").slice(0,16)+'</td>'+
+        '<td class="'+pc+'">'+(p!=null?(p>0?"+":"")+p:"")+'</td>'+
+        '<td>'+(t.exit_reason||t.sell_reason||"")+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+    html+='<button class="btmark" id="bt-plot">Re-plot '+trades.length+' trades on chart</button>';
+  } else {
+    html+='<div class="sys" style="color:var(--text-3);font-size:12px">No trades for this strategy over the selected range.</div>';
+  }
+  box.innerHTML=html;
+  const pb=document.getElementById("bt-plot");
+  if(pb) pb.onclick=()=>plotBtTrades(trades, spec);
+}
+// freqtrade pair "BTC/USDT:USDT" -> UI "BTC_USDT_USDT"
+function ftPairToUi(p){ return String(p||"").replace(/[:/]/g,"_"); }
+// UI "BTC_USDT_USDT" -> display "BTC/USDT:USDT"
+function uiPairDisplay(p){ return String(p||"").replace(/_/g,"/").replace(/\/([^/]+)$/,":$1"); }
+function fmtDay(d){ return (d||"").slice(0,10); }
+// register backtest result as overlay(s) — one per pair — with provenance, then auto-show.
+// auto-switches the chart to the (first) backtest pair + range so trades are visible immediately.
+function plotBtTrades(trades, spec){
+  spec = spec || (BT_LAST&&BT_LAST.spec) || {};
+  if(!trades||!trades.length){ btSetStatus("no trades to plot", true); return; }
+  // group trades by pair
+  const byPair=new Map();
+  trades.forEach(t=>{
+    const ui = t.pair ? ftPairToUi(t.pair) : (CUR_PAIR||"");
+    if(!byPair.has(ui)) byPair.set(ui, []);
+    byPair.get(ui).push(t);
+  });
+  const strat = spec.strategy || "backtest";
+  const rng = (spec.start||spec.end) ? [spec.start||null, spec.end||null] : null;
+  const rngTxt = rng ? (fmtDay(rng[0])+"→"+fmtDay(rng[1])) : "full range";
+  // variant tag: distinguishes re-runs of the same strategy+range with different knobs,
+  // so they STACK as separate overlays instead of replacing each other (Option A).
+  const tags=[];
+  if(spec.minimal_roi){ const v=Object.values(spec.minimal_roi)[0]; if(v!=null) tags.push("ROI"+(+(v*100).toFixed(1))+"%"); }
+  if(spec.stoploss!=null) tags.push("SL"+(+(Math.abs(spec.stoploss)*100).toFixed(1))+"%");
+  if(spec.trailing_stop) tags.push("trail");
+  if(spec.enable_protections) tags.push("prot");
+  if(spec.timeframe) tags.push(spec.timeframe);
+  const variant = tags.join(" ");
+  // dedup only on an IDENTICAL run (same strat+range+knobs); different knobs => new overlay.
+  const runKey = strat+"|"+rngTxt+"|"+variant;
+  OVERLAYS = OVERLAYS.filter(o=>o._runKey!==runKey);
+  const ts=Date.now();
+  let firstUi=null;
+  byPair.forEach((ts_arr, ui)=>{
+    const ms = ts_arr.map(t=>({
+      date:t.open_date, price:t.open_rate??t.open_price,
+      exit_date:t.close_date, exit_price:t.close_rate??t.close_price,
+      confirmed:(t.profit_pct??t.profit_ratio??0)>=0,
+    })).filter(m=>m.date&&m.price!=null);
+    if(!ms.length) return;
+    if(!firstUi) firstUi=ui;
+    const ov = addOverlay({
+      kind:"backtest", label:strat + (variant?" · "+variant:""),
+      meta:uiPairDisplay(ui)+" · "+rngTxt+" · "+ms.length+" trades",
+      pair:ui, range:rng, markers:ms,
+    });
+    ov._runKey=runKey; ov._ts=ts;
+  });
+  if(!firstUi){ btSetStatus("no plottable trades", true); return; }
+  closeBacktest();
+  // auto-switch chart to the backtest pair + range so the plot is visible right away
+  if(firstUi!==CUR_PAIR){
+    loadData(firstUi).then(()=>{ if(rng) jumpRange(rng[0],rng[1]); });
+  } else {
+    if(rng) jumpRange(rng[0],rng[1]);
+    syncOverlays();
+  }
+}
+// ---- Option B: past-backtests picker — choose which stored runs show on the chart ----
+function renderPastBacktests(){
+  const box=document.getElementById("bt-past"); if(!box) return;
+  const runs=OVERLAYS.filter(o=>o.kind==="backtest")
+    .slice().sort((a,b)=>(b._ts||0)-(a._ts||0));
+  let html='<div class="btpast-head"><span class="t">Past backtests ('+runs.length+')</span>';
+  if(runs.length) html+='<button class="btpast-clear" id="btpast-clear">Remove all</button>';
+  html+='</div>';
+  if(!runs.length){
+    html+='<div class="btpast-empty">No past backtests yet. Run one above — it stays here (and on the chart) until you remove it.</div>';
+    box.innerHTML=html; return;
+  }
+  html+='<div class="btpast-list">';
+  runs.forEach(o=>{
+    html+='<div class="btpast-row" data-id="'+o.id+'">'+
+      '<input type="checkbox" '+(o.visible?"checked":"")+' title="show on chart">'+
+      '<span class="pdot" style="background:'+o.color+'"></span>'+
+      '<span class="plab">'+escHtml(o.label)+'</span>'+
+      '<span class="pmeta">'+escHtml(o.meta)+'</span>'+
+      '<button class="pgo" title="show on chart + zoom">↗</button>'+
+      '<button class="px" title="remove">✕</button>'+
+      '</div>';
+  });
+  html+='</div>';
+  box.innerHTML=html;
+  const clr=document.getElementById("btpast-clear");
+  if(clr) clr.onclick=()=>{ OVERLAYS=OVERLAYS.filter(o=>o.kind!=="backtest"); syncOverlays(); saveOverlays(); renderPastBacktests(); };
+  box.querySelectorAll(".btpast-row").forEach(row=>{
+    const id=+row.dataset.id;
+    row.querySelector("input").onchange=()=>{ toggleOverlay(id); };
+    row.querySelector(".px").onclick=()=>{ removeOverlay(id); renderPastBacktests(); };
+    row.querySelector(".pgo").onclick=()=>{
+      const o=OVERLAYS.find(x=>x.id===id); if(!o) return;
+      if(!o.visible) toggleOverlay(id);
+      closeBacktest();
+      if(o.pair && o.pair!==CUR_PAIR){ loadData(o.pair).then(()=>{ if(o.range) jumpRange(o.range[0],o.range[1]); syncOverlays(); }); }
+      else if(o.range){ jumpRange(o.range[0],o.range[1]); }
+    };
+  });
+}
+let _indSearchTimer=null;
+document.getElementById("indsearch").addEventListener("input",()=>{ clearTimeout(_indSearchTimer); _indSearchTimer=setTimeout(buildIndPanel,120); });
+document.getElementById("indclear").onclick=()=>{ ACTIVE.clear(); render(true); buildActive(); buildIndPanel(); };
+
+/* ---------- indicators modal (open/close + tabs) ---------- */
+const indModal=document.getElementById("indmodal");
+function openIndModal(){ indModal.classList.add("show"); buildIndPanel(); setTimeout(()=>document.getElementById("indsearch").focus(),30); }
+function closeIndModal(){ indModal.classList.remove("show"); }
+document.getElementById("indopen").onclick=openIndModal;
+document.getElementById("activeadd").onclick=openIndModal;
+document.getElementById("indmclose").onclick=closeIndModal;
+indModal.onclick=(e)=>{ if(e.target===indModal) closeIndModal(); };
+document.querySelectorAll(".indtab").forEach(b=>{
+  b.onclick=()=>{ IND_TAB=b.dataset.tab; document.querySelectorAll(".indtab").forEach(x=>x.classList.toggle("on",x===b)); buildIndPanel(); };
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){ closeIndModal(); document.getElementById("histmodal").classList.remove("show"); }
+});
+
+/* ---------- collapse toggles ---------- */
+const rightEl=document.getElementById("right");
+const splitterEl=document.getElementById("splitter");
+const rightCollapseBtn=document.getElementById("rightcollapse");
+let lastRightW=(()=>{ const v=parseInt(localStorage.getItem("ck_right_w")||"",10); return (v&&v>=260)?v:560; })();
+rightEl.style.width=lastRightW+"px";
+function setRightCollapsed(c){
+  if(c){ lastRightW=rightEl.getBoundingClientRect().width||lastRightW; rightEl.classList.add("collapsed"); splitterEl.style.display="none"; rightCollapseBtn.textContent="‹"; rightCollapseBtn.style.right="auto"; rightCollapseBtn.style.left="auto"; document.body.appendChild(rightCollapseBtn); rightCollapseBtn.style.position="fixed"; rightCollapseBtn.style.top="48px"; rightCollapseBtn.style.right="8px"; }
+  else { rightEl.classList.remove("collapsed"); rightEl.style.width=lastRightW+"px"; splitterEl.style.display=""; rightCollapseBtn.textContent="›"; rightCollapseBtn.style.position="absolute"; rightCollapseBtn.style.top="9px"; rightCollapseBtn.style.right="9px"; rightCollapseBtn.style.left="auto"; rightEl.prepend(rightCollapseBtn); }
+  if(gd&&gd.data) Plotly.Plots.resize(gd);
+}
+rightCollapseBtn.onclick=()=>setRightCollapsed(!rightEl.classList.contains("collapsed"));
+
+document.querySelector("#activehead .caret").onclick=()=>document.getElementById("activepanel").classList.toggle("collapsed");
+document.querySelector("#activehead .ttl").onclick=()=>document.getElementById("activepanel").classList.toggle("collapsed");
+
+/* ---------- splitter drag ---------- */
+(function(){
+  let dragging=false;
+  splitterEl.addEventListener("mousedown",e=>{ dragging=true; document.body.style.cursor="col-resize"; document.body.style.userSelect="none"; e.preventDefault(); });
+  window.addEventListener("mousemove",e=>{
+    if(!dragging) return;
+    const w=Math.max(260,Math.min(window.innerWidth-300, window.innerWidth-e.clientX));
+    rightEl.style.width=w+"px"; lastRightW=w;
+  });
+  window.addEventListener("mouseup",()=>{
+    if(!dragging) return;
+    dragging=false; document.body.style.cursor=""; document.body.style.userSelect="";
+    try{ localStorage.setItem("ck_right_w", String(Math.round(lastRightW))); }catch(e){}
+    if(gd&&gd.data) Plotly.Plots.resize(gd);
+  });
+})();
+
+/* ---------- On-chart list / chat vertical resize ---------- */
+(function(){
+  const al=document.getElementById("activelist");
+  const rs=document.getElementById("rsplit");
+  if(!al || !rs) return;
+  const MINH=60, MAXH=()=>Math.max(120, window.innerHeight*0.7);
+  const saved=parseInt(localStorage.getItem("cs_activeh")||"",10);
+  if(saved && saved>=MINH){ al.style.maxHeight=saved+"px"; al.style.height=saved+"px"; }
+  let dragging=false, startY=0, startH=0;
+  rs.addEventListener("mousedown",e=>{
+    dragging=true; startY=e.clientY; startH=al.getBoundingClientRect().height;
+    rs.classList.add("dragging"); document.body.style.cursor="ns-resize"; document.body.style.userSelect="none";
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove",e=>{
+    if(!dragging) return;
+    let h=Math.max(MINH, Math.min(MAXH(), startH + (e.clientY-startY)));
+    al.style.maxHeight=h+"px"; al.style.height=h+"px";
+  });
+  window.addEventListener("mouseup",()=>{
+    if(!dragging) return;
+    dragging=false; rs.classList.remove("dragging"); document.body.style.cursor=""; document.body.style.userSelect="";
+    try{ localStorage.setItem("cs_activeh", String(Math.round(al.getBoundingClientRect().height))); }catch(e){}
+  });
+  rs.addEventListener("dblclick",()=>{
+    al.style.maxHeight=""; al.style.height="";
+    try{ localStorage.removeItem("cs_activeh"); }catch(e){}
+  });
+})();
+function modelIconSVG(name){
+  const n=(name||"").toLowerCase();
+  if(n.includes("claude")||n.includes("anthropic")||n.includes("sonnet")||n.includes("opus")||n.includes("haiku"))
+    return '<svg viewBox="0 0 24 24" fill="#d97757" fill-rule="evenodd"><path d="M13.827 3.52h3.603L24 20h-3.603l-6.57-16.48zm-7.258 0h3.767L16.906 20h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522zm4.132 9.959L8.453 7.687 6.205 13.48H10.7z"/></svg>';
+  if(n.includes("gemini")||n.includes("google")||n.includes("bard"))
+    return '<svg viewBox="0 0 24 24"><defs><linearGradient id="g-mi" x1="0%" x2="68.73%" y1="100%" y2="30%"><stop offset="0%" stop-color="#1C7DFF"/><stop offset="52%" stop-color="#1C69FF"/><stop offset="100%" stop-color="#F0DCD6"/></linearGradient></defs><path d="M12 24A14.304 14.304 0 000 12 14.304 14.304 0 0012 0a14.305 14.305 0 0012 12 14.305 14.305 0 00-12 12" fill="url(#g-mi)"/></svg>';
+  if(n.includes("gpt")||n.includes("openai")||n.includes("o1")||n.includes("o3")||n.includes("o4"))
+    return '<svg viewBox="0 0 256 260" fill="#10a37f"><path d="M239.184 106.203a64.716 64.716 0 0 0-5.576-53.103C219.452 28.459 191 15.784 163.213 21.74A65.586 65.586 0 0 0 52.096 45.22a64.716 64.716 0 0 0-43.23 31.36c-14.31 24.602-11.061 55.634 8.033 76.74a64.665 64.665 0 0 0 5.525 53.102c14.174 24.65 42.644 37.324 70.446 31.36a64.72 64.72 0 0 0 48.754 21.744c28.481.025 53.714-18.361 62.414-45.481a64.767 64.767 0 0 0 43.229-31.36c14.137-24.558 10.875-55.423-8.083-76.483Zm-97.56 136.338a48.397 48.397 0 0 1-31.105-11.255l1.535-.87 51.67-29.825a8.595 8.595 0 0 0 4.247-7.367v-72.85l21.845 12.636c.218.111.37.32.409.563v60.367c-.056 26.818-21.783 48.545-48.601 48.601Zm-104.466-44.61a48.345 48.345 0 0 1-5.781-32.589l1.534.921 51.722 29.826a8.339 8.339 0 0 0 8.441 0l63.181-36.425v25.221a.87.87 0 0 1-.358.665l-52.335 30.184c-23.257 13.398-52.97 5.431-66.404-17.803ZM23.549 85.38a48.499 48.499 0 0 1 25.58-21.333v61.39a8.288 8.288 0 0 0 4.195 7.316l62.874 36.272-21.845 12.636a.819.819 0 0 1-.767 0L41.353 151.53c-23.211-13.454-31.171-43.144-17.804-66.405v.256Zm179.466 41.695-63.08-36.63L161.73 77.86a.819.819 0 0 1 .768 0l52.233 30.184a48.6 48.6 0 0 1-7.316 87.635v-61.391a8.544 8.544 0 0 0-4.4-7.213Zm21.742-32.69-1.535-.922-51.619-30.081a8.39 8.39 0 0 0-8.492 0L99.98 99.808V74.587a.716.716 0 0 1 .307-.665l52.233-30.133a48.652 48.652 0 0 1 72.236 50.391v.205ZM88.061 139.097l-21.845-12.585a.87.87 0 0 1-.41-.614V65.685a48.652 48.652 0 0 1 79.757-37.346l-1.535.87-51.67 29.825a8.595 8.595 0 0 0-4.246 7.367l-.051 72.697Zm11.868-25.58 28.138-16.217 28.188 16.218v32.434l-28.086 16.218-28.188-16.218-.052-32.434Z"/></svg>';
+  // fallback bot icon
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="11" rx="2"/><path d="M12 4v4M9 13h.01M15 13h.01"/></svg>';
+}
+function setModelTrigger(name){
+  document.getElementById("modelic").innerHTML = modelIconSVG(name);
+  document.getElementById("modelname").textContent = name || "model";
+}
+async function selectModel(name){
+  const sel=document.getElementById("modelsel");
+  sel.value=name; setModelTrigger(name);
+  document.querySelectorAll(".mp-item").forEach(b=>b.classList.toggle("sel", b.dataset.m===name));
+  document.getElementById("modelpop").classList.remove("show");
+  try{ await fetch(API+"/api/model",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:name})}); }catch(e){}
+  addMsg("model → "+name,"sys");
+}
+async function loadModels(){
+  const sel=document.getElementById("modelsel");
+  const pop=document.getElementById("modelpop");
+  try{
+    const {models,current}=await fetch(API+"/api/models").then(x=>x.json());
+    sel.innerHTML=""; pop.innerHTML="";
+    (models||[]).forEach(m=>{
+      const o=document.createElement("option"); o.value=m; o.textContent=m; sel.appendChild(o);
+      const b=document.createElement("button");
+      b.className="mp-item"; b.type="button"; b.dataset.m=m;
+      b.innerHTML='<span class="mp-ic">'+modelIconSVG(m)+'</span><span class="mp-nm">'+m+'</span>'+
+        '<svg class="mp-chk" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+      b.onclick=()=>selectModel(m);
+      pop.appendChild(b);
+    });
+    const cur = current || (models&&models[0]);
+    if(cur){ sel.value=cur; setModelTrigger(cur); document.querySelectorAll(".mp-item").forEach(b=>b.classList.toggle("sel", b.dataset.m===cur)); }
+  }catch(e){ sel.innerHTML="<option>(models unavailable)</option>"; setModelTrigger("(unavailable)"); }
+}
+document.getElementById("modelbtn").onclick=(e)=>{ e.stopPropagation(); document.getElementById("modelpop").classList.toggle("show"); };
+document.addEventListener("click",(e)=>{ if(!document.getElementById("modelwrap").contains(e.target)) document.getElementById("modelpop").classList.remove("show"); });
+/* attach (+) — surfaces picked filenames into the prompt as a note */
+document.getElementById("attachinput").onchange=(e)=>{
+  const fs=[...(e.target.files||[])].map(f=>f.name);
+  if(fs.length){ const ta=document.getElementById("input");
+    ta.value=(ta.value?ta.value+" ":"")+"[attached: "+fs.join(", ")+"] ";
+    autogrow(); updateSendState(); ta.focus(); }
+};
+/* send button enable/disable mirrors the textarea content */
+function updateSendState(){ const s=document.getElementById("send"); if(s.classList.contains("busy")){ s.disabled=false; return; } const ta=document.getElementById("input"); s.disabled=!ta.value.trim(); }
+
+(async()=>{
+  loadOverlays();   // restore persisted backtest overlays before first render
+  syncCrosshairRail();
+  document.getElementById("legendtoggle").classList.toggle("active", SHOW_LEGEND);
+  await loadPairs();
+  await loadData(CUR_PAIR);
+  await loadModels();
+  document.getElementById("tfsel").value = TF;   // sync dropdown to default TF (15m)
+  setYMode(YMODE);                                 // init floating Y-mode button label
+  updateSendState();                               // init send-button enabled state
+  gd.on("plotly_relayout", onRelayout);
+  // Keep price hidden permanently if user hides it via the legend (otherwise a
+  // pan/zoom slice-reload rebuilds traces and price reappears).
+  gd.on("plotly_legendclick", (d)=>{
+    const t = d && d.data && d.data[d.curveNumber];
+    if(t && t.name==="price"){
+      setShowPrice(!(SHOW_PRICE));  // mirror Plotly's toggle into our persistent flag
+      return false;                 // we handle visibility ourselves via render()
+    }
+    return true;
+  });
+  gd.on("plotly_click", onPlotClick);
+  installWheelZoom();
+  installYZone();
+  installSubsplit();
+  window.addEventListener("resize", ()=>setTimeout(()=>{ positionYZone(); positionSplitter(); },60));
+  addMsg("Sidekick ready. Tap ＋ Indicators to plot lines, manage them under On chart, then ask the analyst anything.","sys");
+})();
+
+/* ---- measure tool (TradingView style) ----------------------------------- */
+function onPlotClick(d){
+  if(!MEASURE) return;
+  const p = d && d.points && d.points[0];
+  if(!p) return;
+  // only measure on the price axis (yaxis === "y"); ignore subplot clicks
+  if(p.yaxis && p.yaxis._id && p.yaxis._id!=="y") return;
+  const x = p.x;
+  const y = (p.close!=null ? p.close : (p.y!=null ? p.y : null)); // candle -> close, line -> y
+  if(y==null) return;
+  if(!MEASURE_A){ MEASURE_A={x, y}; drawMeasure(MEASURE_A, null); return; }
+  drawMeasure(MEASURE_A, {x, y});
+  MEASURE_A=null;            // ready for a fresh measurement on next click
+}
+function _barsBetween(x0, x1){
+  // count actual bars in the loaded slice between the two x values
+  if(!DATA || !DATA.date) return null;
+  const t0=new Date(x0).getTime(), t1=new Date(x1).getTime();
+  const lo=Math.min(t0,t1), hi=Math.max(t0,t1);
+  let n=0; for(const dt of DATA.date){ const t=new Date(dt).getTime(); if(t>=lo && t<=hi) n++; }
+  return n>0 ? n-1 : 0;
+}
+function _fmtDur(ms){
+  const m=Math.abs(ms)/60000; if(m<60) return Math.round(m)+"m";
+  const h=m/60; if(h<48) return h.toFixed(h<10?1:0)+"h";
+  return (h/24).toFixed(1)+"d";
+}
+function drawMeasure(a, b){
+  const shapes=[], anns=[];
+  if(b){
+    const up = b.y>=a.y;
+    const col = up ? "rgba(226,54,54,0.95)" : "rgba(38,166,91,0.95)";
+    const fill= up ? "rgba(226,54,54,0.14)" : "rgba(38,166,91,0.14)";
+    // shaded box between the two points
+    shapes.push({type:"rect", xref:"x", yref:"y", x0:a.x, x1:b.x, y0:a.y, y1:b.y,
+      fillcolor:fill, line:{width:1, color:col}, layer:"above", _meas:true});
+    // diagonal line a->b
+    shapes.push({type:"line", xref:"x", yref:"y", x0:a.x, y0:a.y, x1:b.x, y1:b.y,
+      line:{width:1.5, color:col, dash:"dot"}, layer:"above", _meas:true});
+    const dPrice=b.y-a.y;
+    const dPct = a.y!==0 ? (dPrice/a.y*100) : 0;
+    const bars=_barsBetween(a.x, b.x);
+    const dur=_fmtDur(new Date(b.x).getTime()-new Date(a.x).getTime());
+    const sign=dPrice>=0?"+":"";
+    const txt = sign+dPrice.toPrecision(5)+"  "+sign+dPct.toFixed(2)+"%<br>"
+              + (bars!=null?bars+" bars  ":"") + dur;
+    anns.push({xref:"x", yref:"y", x:b.x, y:b.y, text:txt, showarrow:false,
+      font:{size:11, color:"#fff"}, align:"left",
+      bgcolor: up?"rgba(226,54,54,0.96)":"rgba(38,166,91,0.96)",
+      bordercolor:"#0d0d0d", borderwidth:1, borderpad:4,
+      xanchor: (new Date(b.x)>=new Date(a.x))?"left":"right",
+      yanchor: up?"bottom":"top", _meas:true});
+  } else {
+    // first point marker only
+    shapes.push({type:"line", xref:"x", yref:"y", x0:a.x, x1:a.x, y0:a.y, y1:a.y,
+      line:{width:6, color:"#e3b341"}, layer:"above", _meas:true});
+    anns.push({xref:"x", yref:"y", x:a.x, y:a.y, text:"click 2nd point", showarrow:false,
+      font:{size:10, color:"#0d0d0d"}, bgcolor:"#e3b341", borderpad:3, yanchor:"bottom", _meas:true});
+  }
+  const keepS=(gd.layout.shapes||[]).filter(s=>!s._meas);
+  const keepA=(gd.layout.annotations||[]).filter(s=>!s._meas);
+  Plotly.relayout(gd, {shapes:keepS.concat(shapes), annotations:keepA.concat(anns)});
+}
+function clearMeasure(){
+  const keepS=(gd.layout.shapes||[]).filter(s=>!s._meas);
+  const keepA=(gd.layout.annotations||[]).filter(s=>!s._meas);
+  Plotly.relayout(gd, {shapes:keepS, annotations:keepA});
+}
+
+/* ---- Y-axis zoom strip: drag up/down on the left edge to zoom price scale --- */
+function installYZone(){
+  const yz=document.getElementById("yzone"); if(!yz) return;
+  let st=null;  // {py, ylo, yhi, len}
+  yz.addEventListener("mousedown",(e)=>{
+    const ya=gd._fullLayout.yaxis;
+    const [ylo,yhi]=ya.range.map(Number);
+    st={py:e.clientY, ylo, yhi, len:Math.max(60, ya._length)};
+    if(YMODE!=="manual") setYMode("manual");   // freeze y so the zoom persists
+    yz.classList.add("dragging"); e.preventDefault();
+  });
+  window.addEventListener("mousemove",(e)=>{
+    if(!st) return;
+    // drag up = zoom in (tighter), drag down = zoom out
+    const d=(st.py-e.clientY);
+    const k=Math.pow(0.4, d/st.len);
+    const yc=(st.ylo+st.yhi)/2, yh=(st.yhi-st.ylo)/2*k;
+    Plotly.relayout(gd,{"yaxis.range":[yc-yh, yc+yh]});
+  });
+  window.addEventListener("mouseup",()=>{ if(st){ st=null; yz.classList.remove("dragging"); } });
+  // double-click the strip resets the price axis to auto
+  yz.addEventListener("dblclick",()=> setYMode("auto"));
+}
+
+// Drag the horizontal handle to resize the bottom subplot pane. Moving it DOWN
+// shrinks the subplots (price grows); moving UP grows them. Re-renders the chart
+// with the new SUBPLOT_SPLIT (debounced so dragging stays smooth) and persists it.
+function installSubsplit(){
+  const ss=document.getElementById("subsplit"); if(!ss) return;
+  let st=null, raf=null;
+  const clamp=(v)=>Math.max(0.15, Math.min(0.85, v));
+  ss.addEventListener("mousedown",(e)=>{
+    const fl=gd._fullLayout; if(!fl||!fl.yaxis) return;
+    // total drawable plot height in px (between top and bottom of the full stack)
+    const top=fl.yaxis._offset;                       // px from chart top to price-pane top (paper y=1)
+    const bottom=fl.yaxis2 ? (fl.yaxis2._offset+fl.yaxis2._length) : (fl.yaxis._offset+fl.yaxis._length);
+    st={py:e.clientY, top, height:Math.max(80, bottom-top), start:SUBPLOT_SPLIT};
+    ss.classList.add("dragging");
+    document.body.style.userSelect="none";
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove",(e)=>{
+    if(!st) return;
+    // paper-y increases upward; moving the mouse DOWN lowers paper-y => smaller split
+    const dPaper=(e.clientY-st.py)/st.height;          // px -> paper fraction
+    SUBPLOT_SPLIT=clamp(st.start - dPaper);
+    // move the handle immediately for a smooth feel; re-render on the next frame
+    const oy=gd.getBoundingClientRect().top-document.getElementById("chartcol").getBoundingClientRect().top;
+    ss.style.top=(oy + st.top + (1-SUBPLOT_SPLIT)*st.height - 4)+"px";
+    if(!raf) raf=requestAnimationFrame(()=>{ raf=null; render(true); });
+  });
+  window.addEventListener("mouseup",()=>{
+    if(!st) return;
+    st=null; ss.classList.remove("dragging"); document.body.style.userSelect="";
+    localStorage.setItem("cs_subsplit", String(SUBPLOT_SPLIT));
+    render(true);
+  });
+  // double-click resets to the default split
+  ss.addEventListener("dblclick",()=>{ SUBPLOT_SPLIT=0.435; localStorage.setItem("cs_subsplit","0.435"); render(true); });
+}
+
+/* ---- TradingView-style scroll-to-zoom on the time axis -------------------- */
+function installWheelZoom(){
+  let wheelTimer=null;
+  gd.addEventListener("wheel", (e)=>{
+    const xa = gd._fullLayout && gd._fullLayout.xaxis;
+    if(!xa) return;
+    e.preventDefault();
+    // current x range as numbers (ms epoch for date axes)
+    let [r0,r1] = xa.range.map(v=> (typeof v==="string"? new Date(v).getTime() : (xa.type==="date"? new Date(v).getTime() : +v)));
+    if(!isFinite(r0)||!isFinite(r1)) return;
+    // cursor x in data coords -> zoom anchor (keeps point under cursor fixed)
+    const bb = gd.getBoundingClientRect();
+    const px = e.clientX - bb.left;
+    const frac = Math.min(1, Math.max(0, (px - xa._offset) / xa._length));
+    const anchor = r0 + (r1 - r0) * frac;
+    // scroll up (deltaY<0) => zoom in; factor per notch
+    const k = e.deltaY < 0 ? 0.82 : 1.22;
+    const n0 = anchor - (anchor - r0) * k;
+    const n1 = anchor + (r1 - anchor) * k;
+    const toV = (ms)=> xa.type==="date" ? new Date(ms).toISOString() : ms;
+    Plotly.relayout(gd, {"xaxis.range":[toV(n0), toV(n1)]});
+    // debounce the data-slice reload (same pattern as drag-zoom)
+    clearTimeout(wheelTimer);
+    wheelTimer=setTimeout(()=>reloadSlice(toV(n0), toV(n1)), 220);
+  }, {passive:false});
+}
+</script>
+</body>
+</html>

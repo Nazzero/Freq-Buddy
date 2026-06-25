@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Runtime / generated state (not source)
+shots/
+_cdp_out/
+_analyst_cache/
+versions_img/
+chat_history.jsonl
+chat_history.*.jsonl
+*.log
+brain.out
+
+# Editor / OS cruft
+.DS_Store
+*.bak
+*.swp
+*~
+_t_feat.py
