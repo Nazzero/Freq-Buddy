@@ -73,6 +73,8 @@ def compute_profile(df: pd.DataFrame) -> dict:
         kind = _kind(col, s, close_med)
         entry: dict = {"kind": kind}
         if pd.api.types.is_numeric_dtype(s):
+            if pd.api.types.is_bool_dtype(s):
+                s = s.astype("int8")
             valid = s.dropna()
             if valid.empty:
                 entry.update({"null_pct": 100.0})
@@ -124,10 +126,13 @@ def _notable_events(df: pd.DataFrame, k: int = 8) -> list:
     ret = df["close"].pct_change().fillna(0.0)
     win = max(4, len(df) // 1000)               # ~rolling window of moves
     roll = ret.rolling(win).sum()
+    dates = pd.to_datetime(df["date"], errors="coerce")
     idx = roll.abs().sort_values(ascending=False).index[: k * 3]
     out, seen = [], []
     for i in idx:
-        d = df["date"].iloc[i]
+        d = dates.iloc[i]
+        if pd.isna(d):
+            continue
         if any(abs((d - s).total_seconds()) < 86400 * 3 for s in seen):
             continue
         seen.append(d)

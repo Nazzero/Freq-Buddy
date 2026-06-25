@@ -7,7 +7,7 @@ user_data/indicator_dumps/<PAIR>_indicators.csv.
 
 Run inside the freqtrade docker container:
   docker compose run --rm --entrypoint python3 freqtrade \
-    user_data/../chartsidekick/dump_indicators.py --strategy CURIOUS
+    user_data/../chartsidekick/dump_indicators.py --strategy Vaultwave
 """
 import argparse
 import logging
@@ -36,7 +36,7 @@ OUT_DIR = Path("/freqtrade/user_data/indicator_dumps")
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="/freqtrade/user_data/config.json")
-    ap.add_argument("--strategy", default="CURIOUS")
+    ap.add_argument("--strategy", default="Vaultwave")
     ap.add_argument("--timerange", default=None,
                     help="optional freqtrade timerange, e.g. 20240101-20250501")
     args = ap.parse_args()

@@ -43,7 +43,7 @@ PAIRS = [
 
 app = FastAPI(title="Chart Sidekick")
 
-_cache: dict[str, pd.DataFrame] = {}
+_cache: dict[str, tuple[float, pd.DataFrame]] = {}
 
 TF_RULES = {
     "15m": None,
@@ -78,11 +78,14 @@ def list_models() -> list[str]:
 
 
 def load_pair(pair: str) -> pd.DataFrame:
-    if pair not in _cache:
-        df = pd.read_csv(DUMP_DIR / f"{pair}_indicators.csv")
+    path = DUMP_DIR / f"{pair}_indicators.csv"
+    mtime = path.stat().st_mtime
+    cached = _cache.get(pair)
+    if cached is None or cached[0] != mtime:
+        df = pd.read_csv(path)
         df["date"] = pd.to_datetime(df["date"], utc=True)
-        _cache[pair] = df
-    return _cache[pair]
+        _cache[pair] = (mtime, df)
+    return _cache[pair][1]
 
 
 def apply_timeframe(df: pd.DataFrame, tf: str) -> pd.DataFrame:
