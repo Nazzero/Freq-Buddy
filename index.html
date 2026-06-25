@@ -47,7 +47,6 @@
   .tb-text .caret-s{ color:var(--text-3); font-size:11px; }
   #pair{ background:transparent; color:var(--text); border:1px solid transparent; font-weight:600; font-family:var(--mono); letter-spacing:.3px; padding:5px 8px; border-radius:var(--r-sm); font-size:12px; cursor:pointer; }
   #pair:hover{ background:var(--panel-2); }
-  #status{ font-family:var(--mono); font-size:10px; color:var(--text-3); white-space:nowrap; margin-left:8px; flex:0 0 auto; }
   /* toolbar select (timeframe) */
   .tb-sel{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:var(--r-sm); padding:5px 8px; font:inherit; font-size:13px; font-weight:600; cursor:pointer; flex:0 0 auto; }
   .tb-sel:hover{ border-color:var(--accent-line); }
@@ -106,6 +105,11 @@
   #chartcol{ flex:1; display:flex; flex-direction:column; min-width:0; position:relative; }
   /* chart header overlay (OHLC line) */
   #charthead{ position:absolute; z-index:6; top:8px; left:14px; pointer-events:none; font-family:var(--mono); }
+  /* pair + bars-in-view, overlaid on the main plot bottom-left (just above its x-axis), low opacity */
+  #plotstatus{ position:absolute; z-index:5; left:14px; pointer-events:none; font-family:var(--mono);
+    font-size:10px; color:var(--text-2); opacity:.42; white-space:nowrap; letter-spacing:.2px;
+    text-shadow:0 1px 2px rgba(0,0,0,.55); }
+  #plotstatus:empty{ display:none; }
   .chh-row{ display:flex; align-items:center; gap:14px; line-height:1.7; }
   .chh-pair{ color:var(--text); font-weight:700; font-size:13px; }
   .chh-tf{ color:var(--ok); font-size:13px; font-weight:600; }
@@ -155,10 +159,18 @@
   #splitter:hover{ background:var(--accent-line); }
 
   /* ---- right panel ---- */
-  #right{ width:560px; display:flex; flex-direction:column; background:var(--bg); border-left:1px solid var(--border); min-width:0; }
-  #right.collapsed{ width:0 !important; border:none; overflow:hidden; }
-  #rightcollapse{ position:absolute; top:9px; right:9px; z-index:20; background:var(--panel); color:var(--text-2); border:1px solid var(--border); border-radius:var(--r-sm); width:26px; height:26px; padding:0; font-size:13px; cursor:pointer; }
-  #rightcollapse:hover{ border-color:var(--accent); color:var(--text); }
+  #right{ width:560px; display:flex; flex-direction:column; background:var(--bg); border-left:1px solid var(--border); min-width:0; position:relative; }
+  #right.collapsed{ width:0 !important; border:none; overflow:visible; }
+  /* thin, tall collapse strip hugging the LEFT edge of the AI panel (icon-only) */
+  #rightcollapse{ position:absolute; top:0; left:-15px; bottom:0; z-index:20;
+    width:15px; height:100%; padding:0; background:var(--bg-2); color:var(--text-3);
+    border:none; border-left:1px solid var(--border); border-right:1px solid var(--border-soft);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    font-size:12px; line-height:1; transition:background .12s,color .12s; }
+  #rightcollapse svg{ width:13px; height:13px; }
+  #rightcollapse:hover{ background:var(--panel-2); color:var(--text); }
+  /* when collapsed the panel has 0 width, so pin the strip to the screen's right edge */
+  #right.collapsed #rightcollapse{ left:auto; right:0; }
 
   /* presets bar */
   #presetbar{ display:flex; gap:8px; align-items:center; padding:10px 12px; background:var(--bg-2); border-bottom:1px solid var(--border-soft); flex-wrap:nowrap; }
@@ -236,7 +248,9 @@
 
   /* ---- chat ---- */
   .skhead{ display:flex; align-items:center; gap:8px; padding:11px 12px; background:var(--bg-2); border-bottom:1px solid var(--border); border-top:1px solid var(--border); }
-  .skhead .dot{ width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok); }
+  .skhead .dot{ width:7px; height:7px; border-radius:50%; background:var(--text-3); box-shadow:none; transition:background .25s, box-shadow .25s; }
+  .skhead .dot.connected{ background:var(--ok); box-shadow:0 0 8px var(--ok); }
+  .skhead .dot.offline{ background:var(--danger); box-shadow:0 0 6px rgba(229,83,75,.5); }
   .skhead .ttl{ font-size:13px; font-weight:700; letter-spacing:.2px; }
   .skhead .sub{ margin-left:auto; font-size:10px; color:var(--text-3); font-family:var(--mono); }
   #logsbtn{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; padding:0; background:transparent; border:1px solid var(--border); border-radius:7px; color:var(--text-3); cursor:pointer; }
@@ -525,8 +539,6 @@
       <button class="tb-ico" id="snapbtn" title="screenshot chart">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.5-2h7L18 8h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.2"/></svg>
       </button>
-      <span class="tb-div"></span>
-      <span id="status">loading…</span>
     </div>
     <div id="chartwrap">
       <div id="leftrail">
@@ -620,6 +632,7 @@
           </div>
         </div>
         <div id="chart"></div>
+        <div id="plotstatus" title="pair and bars in view"></div>
         <div id="overlaybar"></div>
         <button id="ymodebtn" title="cycle y-axis: auto / manual / log">Y-A</button>
         <div id="yzone" title="drag up = zoom out, down = zoom in (price axis only)"><span class="yhint">↕ price zoom</span></div>
@@ -629,7 +642,9 @@
   </div>
   <div id="splitter"></div>
   <div id="right">
-    <button id="rightcollapse" title="collapse panel">›</button>
+    <button id="rightcollapse" title="collapse panel">
+      <svg id="rcicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
     <div id="presetbar">
       <span class="lbl">Preset</span>
       <select id="presetsel" title="select a preset to apply"><option value="">— none —</option></select>
@@ -658,7 +673,7 @@
     </div>
     <div id="rsplit" title="drag to resize the On-chart list vs the Sidekick chat"><span class="rshint"></span></div>
     <div class="skhead">
-      <span class="dot"></span>
+      <span class="dot" id="conndot" title="connecting to AI…"></span>
       <span class="ttl">Sidekick</span>
       <span id="busydot" title="working…"></span>
       <span class="sub">quant analyst</span>
@@ -774,6 +789,30 @@
 </div>
 <script>
 const API = "";
+
+/* ---- AI connectivity light: dot is lit only when the brain is alive and ready ---- */
+(function(){
+  const dot=document.getElementById("conndot");
+  if(!dot) return;
+  async function poll(){
+    try{
+      const r=await fetch(API+"/api/brain/status",{cache:"no-store"});
+      const s=await r.json();
+      if(s.connected){
+        dot.classList.add("connected"); dot.classList.remove("offline");
+        dot.title = s.busy ? "connected — AI is working…" : "connected to AI — ready";
+      }else{
+        dot.classList.remove("connected"); dot.classList.add("offline");
+        dot.title = "AI offline — brain not responding";
+      }
+    }catch(e){
+      dot.classList.remove("connected"); dot.classList.add("offline");
+      dot.title = "server unreachable";
+    }
+  }
+  poll();
+  setInterval(poll, 2500);
+})();
 let DATA = null;
 let COLS = {ohlcv:[], indicators:[]};
 let RANGES = {};             // name -> {bucket,min,max}
@@ -936,7 +975,25 @@ function fmtDur2(ms){
   const m=Math.floor(s/60), rem=Math.round(s-m*60);
   return m+"m "+rem+"s";
 }
-function setStatus(t){ document.getElementById("status").textContent=t; }
+function setStatus(t){
+  const el=document.getElementById("plotstatus");
+  if(el){ el.textContent=t; positionPlotStatus(); }
+}
+/* Pin the pair/bars label to the bottom-left of the MAIN plot, just above its
+   x-axis (above any subplots). Reads the price y-axis domain bottom from the
+   current Plotly layout so it tracks the subplot split as it is dragged. */
+function positionPlotStatus(){
+  const el=document.getElementById("plotstatus");
+  if(!el || !gd || !gd._fullLayout) return;
+  const fl=gd._fullLayout;
+  // bottom of the price pane in paper coords (0=bottom,1=top); fall back to 0.
+  let yBot=0;
+  try{ yBot=(fl.yaxis && fl.yaxis.domain) ? fl.yaxis.domain[0] : 0; }catch(e){}
+  const H=gd.clientHeight||gd.getBoundingClientRect().height||0;
+  const bottomMargin=(fl.margin && fl.margin.b)||0;
+  // pixels from container bottom = pane-bottom fraction * height + plot bottom margin
+  el.style.bottom=(yBot*H + bottomMargin + 4)+"px";
+}
 function saveFavs(){ localStorage.setItem("cs_favs", JSON.stringify([...FAVS])); }
 function savePresets(){ localStorage.setItem("cs_presets", JSON.stringify(PRESETS)); }
 
@@ -1298,7 +1355,7 @@ function render(preserveRange){
     layout.shapes = (layout.shapes||[]).filter(s=>!s._div).concat(dividers);
   }
   Plotly.react(gd, traces, layout, {scrollZoom:false, displayModeBar:true, responsive:true})
-    .then(positionYZone).then(positionSplitter).then(()=>{ try{updateChartHead(null);}catch(e){} });
+    .then(positionYZone).then(positionSplitter).then(positionPlotStatus).then(()=>{ try{updateChartHead(null);}catch(e){} });
 }
 // Place the Y-axis zoom strip over the left edge of the price plot.
 function positionYZone(){
@@ -2398,8 +2455,20 @@ const rightCollapseBtn=document.getElementById("rightcollapse");
 let lastRightW=(()=>{ const v=parseInt(localStorage.getItem("ck_right_w")||"",10); return (v&&v>=260)?v:560; })();
 rightEl.style.width=lastRightW+"px";
 function setRightCollapsed(c){
-  if(c){ lastRightW=rightEl.getBoundingClientRect().width||lastRightW; rightEl.classList.add("collapsed"); splitterEl.style.display="none"; rightCollapseBtn.textContent="‹"; rightCollapseBtn.style.right="auto"; rightCollapseBtn.style.left="auto"; document.body.appendChild(rightCollapseBtn); rightCollapseBtn.style.position="fixed"; rightCollapseBtn.style.top="48px"; rightCollapseBtn.style.right="8px"; }
-  else { rightEl.classList.remove("collapsed"); rightEl.style.width=lastRightW+"px"; splitterEl.style.display=""; rightCollapseBtn.textContent="›"; rightCollapseBtn.style.position="absolute"; rightCollapseBtn.style.top="9px"; rightCollapseBtn.style.right="9px"; rightCollapseBtn.style.left="auto"; rightEl.prepend(rightCollapseBtn); }
+  const icon=document.getElementById("rcicon");
+  if(c){
+    lastRightW=rightEl.getBoundingClientRect().width||lastRightW;
+    rightEl.classList.add("collapsed");
+    splitterEl.style.display="none";
+    if(icon) icon.style.transform="rotate(180deg)";   // ‹ : click to expand
+    rightCollapseBtn.title="expand panel";
+  }else{
+    rightEl.classList.remove("collapsed");
+    rightEl.style.width=lastRightW+"px";
+    splitterEl.style.display="";
+    if(icon) icon.style.transform="";                 // › : click to collapse
+    rightCollapseBtn.title="collapse panel";
+  }
   if(gd&&gd.data) Plotly.Plots.resize(gd);
 }
 rightCollapseBtn.onclick=()=>setRightCollapsed(!rightEl.classList.contains("collapsed"));
@@ -2532,7 +2601,7 @@ function updateSendState(){ const s=document.getElementById("send"); if(s.classL
   installWheelZoom();
   installYZone();
   installSubsplit();
-  window.addEventListener("resize", ()=>setTimeout(()=>{ positionYZone(); positionSplitter(); },60));
+  window.addEventListener("resize", ()=>setTimeout(()=>{ positionYZone(); positionSplitter(); positionPlotStatus(); },60));
   addMsg("Sidekick ready. Tap ＋ Indicators to plot lines, manage them under On chart, then ask the analyst anything.","sys");
 })();
 

@@ -959,6 +959,7 @@ _pending: list[dict] = []       # messages waiting for brain
 _responses: dict[str, dict] = {}  # id -> {reply, actions}
 _inflight: dict[str, dict] = {}   # id -> original message (text/chart_state) for history
 _cancelled: set[str] = set()      # ids the user asked to STOP; brain checks + bails
+_brain_last_seen: float = 0.0     # epoch secs of the brain's most recent poll (heartbeat)
 _activity: list[dict] = []        # ring buffer of brain activity events for the logs panel
 ACTIVITY_MAX = 400                # keep last N events in memory
 # If an in-flight turn has had no brain activity for this long and still has no
@@ -1132,7 +1133,9 @@ class ActivityEvent(BaseModel):
 
 @app.post("/brain/log")
 def brain_log(ev: ActivityEvent):
+    global _brain_last_seen
     with _lock:
+        _brain_last_seen = time.time()   # heartbeat: brain active mid-turn
         _activity.append({"ts": time.time(), "mid": ev.mid, "phase": ev.phase,
                           "detail": ev.detail, "meta": ev.meta or {}})
         del _activity[:-ACTIVITY_MAX]
@@ -1150,10 +1153,28 @@ def api_activity(since: float = 0.0, mid: str | None = None, limit: int = 200):
 # --- brain side ---
 @app.get("/brain/pending")
 def brain_pending():
+    global _brain_last_seen
     with _lock:
+        _brain_last_seen = time.time()   # heartbeat: brain is alive and polling
         items = list(_pending)
         _pending.clear()
     return {"messages": items}
+
+
+@app.get("/api/brain/status")
+def api_brain_status():
+    """UI connectivity light. `connected` is true only while the brain has polled
+    recently (it polls /brain/pending every ~2s), meaning it is alive and ready
+    to talk to the AI. `busy` is true while a turn is in flight."""
+    with _lock:
+        age = time.time() - _brain_last_seen if _brain_last_seen else None
+        busy = bool(_inflight)
+        # Idle brain polls every ~0.6s, so a >6s gap means it is gone. While a turn
+        # is in flight the brain blocks on model calls and only checks in via
+        # /brain/log every ~13s, so allow a longer gap before declaring it offline.
+        limit = 20.0 if busy else 6.0
+        connected = age is not None and age < limit
+    return {"connected": connected, "busy": busy, "age": age}
 
 
 class BrainReply(BaseModel):
