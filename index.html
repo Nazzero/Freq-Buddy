@@ -47,8 +47,48 @@
   .tb-text .caret-s{ color:var(--text-3); font-size:11px; }
   #pair{ background:transparent; color:var(--text); border:1px solid transparent; font-weight:600; font-family:var(--mono); letter-spacing:.3px; padding:5px 8px; border-radius:var(--r-sm); font-size:12px; cursor:pointer; }
   #pair:hover{ background:var(--panel-2); }
-  #stratsel{ background:transparent; color:var(--text-2); border:1px solid var(--border); font-weight:600; font-family:var(--mono); letter-spacing:.3px; padding:5px 8px; border-radius:var(--r-sm); font-size:11px; cursor:pointer; }
+  #stratsel{ background:transparent; color:var(--text-2); border:1px solid var(--border); font-weight:600; font-family:var(--mono); letter-spacing:.3px; padding:5px 8px; border-radius:var(--r-sm) 0 0 var(--r-sm); border-right:none; font-size:11px; cursor:pointer; }
   #stratsel:hover{ background:var(--panel-2); color:var(--text); }
+  .stratgroup{ display:inline-flex; align-items:stretch; }
+  .stratgroup .stratbtn{ width:26px; height:auto; padding:0; border:1px solid var(--border); border-left:none; border-radius:0; background:transparent; color:var(--text-2); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+  .stratgroup .stratbtn svg{ width:13px; height:13px; }
+  .stratgroup .stratbtn:hover{ background:var(--panel-2); color:var(--text); }
+  .stratgroup #stratadd{ border-radius:0 var(--r-sm) var(--r-sm) 0; }
+  /* ---- strategy add/edit modal ---- */
+  #stratmodal{ position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; }
+  #stratmodal.open{ display:flex; }
+  #stratmodal .card{ width:460px; max-width:92vw; max-height:88vh; overflow:auto; background:var(--panel); border:1px solid var(--border); border-radius:12px; box-shadow:0 18px 50px rgba(0,0,0,.5); }
+  #stratmodal .hd{ display:flex; align-items:center; justify-content:space-between; padding:16px 18px 10px; }
+  #stratmodal .hd h3{ margin:0; font-size:15px; font-weight:700; color:var(--text); }
+  #stratmodal .hd .x{ background:none; border:none; color:var(--text-2); font-size:20px; cursor:pointer; line-height:1; }
+  #stratmodal .hd .x:hover{ color:var(--text); }
+  #stratmodal .bd{ padding:4px 18px 18px; }
+  #stratmodal label.fld{ display:block; font-size:11px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.4px; margin:14px 0 6px; }
+  #stratmodal select, #stratmodal input[type=text]{ width:100%; box-sizing:border-box; background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:var(--r-sm); padding:8px 10px; font:inherit; font-size:13px; }
+  #stratmodal .pairgrid{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  #stratmodal .pairchk{ display:flex; align-items:center; gap:7px; padding:6px 8px; border:1px solid var(--border); border-radius:var(--r-sm); font-size:12px; font-family:var(--mono); cursor:pointer; color:var(--text); user-select:none; }
+  #stratmodal .pairchk:hover{ background:var(--panel-2); }
+  #stratmodal .pairchk input{ accent-color:#2563eb; }
+  #stratmodal .pairtools{ display:flex; gap:10px; margin:6px 0 0; }
+  #stratmodal .pairtools a{ font-size:11px; color:#60a5fa; cursor:pointer; }
+  #stratmodal .hint{ font-size:11px; color:var(--text-3,#6b7280); margin-top:5px; }
+  #stratmodal .ft{ display:flex; align-items:center; gap:10px; margin-top:18px; }
+  #stratmodal .ft .spacer{ flex:1; }
+  #stratmodal .btn{ border:1px solid var(--border); border-radius:var(--r-sm); padding:8px 16px; font:inherit; font-size:13px; font-weight:600; cursor:pointer; background:var(--panel-2); color:var(--text); }
+  #stratmodal .btn:hover{ background:var(--border); }
+  #stratmodal .btn.primary{ background:#2563eb; border-color:#3b82f6; color:#fff; }
+  #stratmodal .btn.primary:hover{ background:#3b82f6; }
+  #stratmodal .btn.primary:disabled{ opacity:.5; cursor:not-allowed; }
+  #stratmodal .btn.danger{ background:#3a1111; border-color:#7f1d1d; color:#fca5a5; }
+  #stratmodal .btn.danger:hover{ background:#5b1414; }
+  #stratmodal .err{ color:#f87171; font-size:12px; margin-top:10px; min-height:0; }
+  /* progress */
+  #stratmodal .prog{ display:none; margin-top:16px; }
+  #stratmodal .prog.show{ display:block; }
+  #stratmodal .pbar{ height:8px; border-radius:5px; background:var(--panel-2); overflow:hidden; border:1px solid var(--border); }
+  #stratmodal .pfill{ height:100%; width:0%; background:linear-gradient(90deg,#2563eb,#22d3ee); transition:width .3s ease; }
+  #stratmodal .pmeta{ display:flex; justify-content:space-between; font-size:12px; color:var(--text-2); margin-top:8px; }
+  #stratmodal .plog{ margin-top:10px; max-height:120px; overflow:auto; background:#0b0e14; border:1px solid var(--border); border-radius:var(--r-sm); padding:8px 10px; font-family:var(--mono); font-size:11px; color:#9aa4b2; white-space:pre-wrap; }
   /* toolbar select (timeframe) */
   .tb-sel{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:var(--r-sm); padding:5px 8px; font:inherit; font-size:13px; font-weight:600; cursor:pointer; flex:0 0 auto; }
   .tb-sel:hover{ border-color:var(--accent-line); }
@@ -551,7 +591,15 @@
         Backtest
       </button>
       <select id="pair" title="pair"></select>
-      <select id="stratsel" title="strategy (which indicator set to load)"></select>
+      <span id="stratgroup" class="stratgroup">
+        <select id="stratsel" title="strategy (which indicator set to load)"></select>
+        <button class="tb-ico stratbtn" id="stratgear" title="edit / delete this strategy's dump">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <button class="tb-ico stratbtn" id="stratadd" title="add a strategy (generate its indicator dump)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        </button>
+      </span>
       <span class="tb-sp"></span>
       <button class="tb-ico" id="resetzoom" title="reset zoom (fit all)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
@@ -770,6 +818,33 @@
   <div id="histcard">
     <div id="histhead"><span>Past sessions</span><button id="histclose">✕</button></div>
     <div id="histlist"></div>
+  </div>
+</div>
+
+<div id="stratmodal">
+  <div class="card">
+    <div class="hd"><h3 id="strat-title">Add strategy</h3><button class="x" id="strat-x">✕</button></div>
+    <div class="bd">
+      <label class="fld" for="strat-name">Strategy</label>
+      <select id="strat-name"></select>
+      <label class="fld">Pairs <span class="hint" id="strat-pairhint" style="text-transform:none;font-weight:400;"></span></label>
+      <div class="pairtools"><a id="strat-allpairs">select all</a><a id="strat-nopairs">clear</a></div>
+      <div class="pairgrid" id="strat-pairs"></div>
+      <label class="fld" for="strat-tr">Timerange <span class="hint" style="text-transform:none;font-weight:400;">(optional, blank = full history)</span></label>
+      <input type="text" id="strat-tr" placeholder="20240101-20250501" />
+      <div class="err" id="strat-err"></div>
+      <div class="prog" id="strat-prog">
+        <div class="pbar"><div class="pfill" id="strat-pfill"></div></div>
+        <div class="pmeta"><span id="strat-pphase">starting…</span><span id="strat-pcount"></span></div>
+        <div class="plog" id="strat-plog"></div>
+      </div>
+      <div class="ft">
+        <button class="btn danger" id="strat-delete" style="display:none;">Delete dump</button>
+        <span class="spacer"></span>
+        <button class="btn" id="strat-cancel">Cancel</button>
+        <button class="btn primary" id="strat-run">Generate</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1045,8 +1120,155 @@ async function loadDumpStrategies(){
     strats.forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;sel.appendChild(o);});
     CUR_STRAT=j.current||strats[0]||null;
     if(CUR_STRAT) sel.value=CUR_STRAT;
+    // selector itself hides when there's nothing dumped yet, but keep the + button
+    // visible (via the group) so the user can always add a strategy.
     sel.style.display = strats.length ? "" : "none";
+    const gear=document.getElementById("stratgear");
+    if(gear) gear.style.display = strats.length ? "" : "none";
   }catch(e){ CUR_STRAT=null; sel.style.display="none"; }
+}
+
+// ---- strategy add / edit / delete modal ----
+let STRAT_MODE="add";          // "add" | "edit"
+let STRAT_EDIT_NAME=null;      // strategy being edited (edit mode)
+let STRAT_POLL=null;           // active progress poll timer
+
+function stratModalEl(id){ return document.getElementById(id); }
+
+async function openStratModal(mode, editName){
+  STRAT_MODE=mode; STRAT_EDIT_NAME=editName||null;
+  const m=stratModalEl("stratmodal");
+  stratModalEl("strat-err").textContent="";
+  stratModalEl("strat-prog").classList.remove("show");
+  stratModalEl("strat-run").disabled=false;
+  stratModalEl("strat-run").textContent = mode==="edit" ? "Re-generate" : "Generate";
+  stratModalEl("strat-title").textContent = mode==="edit" ? ("Edit: "+editName) : "Add strategy";
+  stratModalEl("strat-delete").style.display = mode==="edit" ? "" : "none";
+  // strategy name: in edit mode it's fixed; in add mode pick from strategies folder
+  const nameSel=stratModalEl("strat-name");
+  nameSel.innerHTML="";
+  try{
+    const sj=await fetch(API+"/api/strategies").then(r=>r.json());
+    (sj.strategies||[]).forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;nameSel.appendChild(o);});
+  }catch(e){}
+  nameSel.disabled = (mode==="edit");
+  // pair checkboxes — only pairs with downloaded data
+  const pj=await fetch(API+"/api/dumpable_pairs").then(r=>r.json()).catch(()=>({pairs:[]}));
+  const pairs=pj.pairs||[];
+  const grid=stratModalEl("strat-pairs"); grid.innerHTML="";
+  pairs.forEach(p=>{
+    const lbl=document.createElement("label"); lbl.className="pairchk";
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.value=p; cb.checked=true;
+    lbl.appendChild(cb); lbl.appendChild(document.createTextNode(p.replace(/_/g,"/").replace("/USDT/USDT",":USDT")));
+    grid.appendChild(lbl);
+  });
+  stratModalEl("strat-pairhint").textContent = "("+pairs.length+" with 15m data)";
+  stratModalEl("strat-tr").value="";
+  // in edit mode prefill saved pairs + timerange from the registry
+  if(mode==="edit"){
+    nameSel.value=editName;
+    try{
+      const cfg=await fetch(API+"/api/dump_registry/"+encodeURIComponent(editName)).then(r=>r.json());
+      if(cfg && cfg.ok && cfg.entry){
+        const savedPairs=new Set(cfg.entry.pairs||[]);
+        document.querySelectorAll("#strat-pairs input").forEach(c=>{ c.checked = savedPairs.has(c.value); });
+        stratModalEl("strat-tr").value = cfg.entry.timerange || "";
+      }
+    }catch(e){}
+  }
+  m.classList.add("open");
+}
+
+function closeStratModal(){
+  if(STRAT_POLL){ clearInterval(STRAT_POLL); STRAT_POLL=null; }
+  stratModalEl("stratmodal").classList.remove("open");
+}
+
+function selectedStratPairs(){
+  return Array.from(document.querySelectorAll("#strat-pairs input:checked")).map(c=>c.value);
+}
+
+async function runStratDump(){
+  const strategy=stratModalEl("strat-name").value;
+  const pairs=selectedStratPairs();
+  const timerange=stratModalEl("strat-tr").value.trim();
+  const errEl=stratModalEl("strat-err"); errEl.textContent="";
+  if(!strategy){ errEl.textContent="pick a strategy"; return; }
+  if(!pairs.length){ errEl.textContent="select at least one pair"; return; }
+  if(timerange && !/^\d{0,8}-\d{0,8}$/.test(timerange)){ errEl.textContent="timerange must look like 20240101-20250501"; return; }
+  stratModalEl("strat-run").disabled=true;
+  const body={strategy, pairs, timerange: timerange||null};
+  let res;
+  try{
+    res=await fetch(API+"/api/dump_jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json());
+  }catch(e){ errEl.textContent="request failed"; stratModalEl("strat-run").disabled=false; return; }
+  if(!res.ok){ errEl.textContent=res.error||"failed to start"; stratModalEl("strat-run").disabled=false; return; }
+  // show progress, poll
+  stratModalEl("strat-prog").classList.add("show");
+  stratModalEl("strat-pfill").style.width="0%";
+  stratModalEl("strat-pphase").textContent="starting…";
+  stratModalEl("strat-pcount").textContent="";
+  stratModalEl("strat-plog").textContent="";
+  pollStratJob(res.job_id, strategy);
+}
+
+function pollStratJob(jobId, strategy){
+  if(STRAT_POLL) clearInterval(STRAT_POLL);
+  STRAT_POLL=setInterval(async()=>{
+    let s;
+    try{ s=await fetch(API+"/api/dump_jobs/"+jobId).then(r=>r.json()); }catch(e){ return; }
+    const done=s.done||0, total=s.total||1;
+    const pct=Math.max(2, Math.round((done/total)*100));
+    stratModalEl("strat-pfill").style.width=pct+"%";
+    stratModalEl("strat-pphase").textContent=s.phase||s.status||"";
+    stratModalEl("strat-pcount").textContent=done+" / "+total+" pairs";
+    if(s.log){ const l=stratModalEl("strat-plog"); l.textContent=s.log; l.scrollTop=l.scrollHeight; }
+    if(s.status==="done"){
+      clearInterval(STRAT_POLL); STRAT_POLL=null;
+      stratModalEl("strat-pfill").style.width="100%";
+      stratModalEl("strat-pphase").textContent="done ✓";
+      // refresh dropdown, select the new strategy, reload chart
+      await loadDumpStrategies();
+      const sel=document.getElementById("stratsel");
+      if([...sel.options].some(o=>o.value===strategy)){ sel.value=strategy; CUR_STRAT=strategy; }
+      loadData(CUR_PAIR);
+      setTimeout(closeStratModal, 700);
+    } else if(s.status==="error"){
+      clearInterval(STRAT_POLL); STRAT_POLL=null;
+      stratModalEl("strat-err").textContent=s.error||"dump failed";
+      stratModalEl("strat-run").disabled=false;
+    }
+  }, 1200);
+}
+
+async function deleteStratDump(){
+  const name=STRAT_EDIT_NAME; if(!name) return;
+  if(!confirm("Delete the indicator dump for \""+name+"\"? This removes its CSVs from disk.")) return;
+  const errEl=stratModalEl("strat-err"); errEl.textContent="";
+  let res;
+  try{ res=await fetch(API+"/api/dump_strategies/"+encodeURIComponent(name),{method:"DELETE"}).then(r=>r.json()); }
+  catch(e){ errEl.textContent="request failed"; return; }
+  if(!res.ok){ errEl.textContent=res.error||"delete failed"; return; }
+  await loadDumpStrategies();
+  // if the deleted one was loaded, switch to whatever's current
+  const sel=document.getElementById("stratsel");
+  CUR_STRAT = sel.value || null;
+  loadData(CUR_PAIR);
+  closeStratModal();
+}
+
+function wireStratModal(){
+  const add=document.getElementById("stratadd");
+  const gear=document.getElementById("stratgear");
+  if(add) add.onclick=()=>openStratModal("add");
+  if(gear) gear.onclick=()=>{ const cur=document.getElementById("stratsel").value; if(cur) openStratModal("edit",cur); };
+  stratModalEl("strat-x").onclick=closeStratModal;
+  stratModalEl("strat-cancel").onclick=closeStratModal;
+  stratModalEl("strat-run").onclick=runStratDump;
+  stratModalEl("strat-delete").onclick=deleteStratDump;
+  stratModalEl("strat-allpairs").onclick=()=>document.querySelectorAll("#strat-pairs input").forEach(c=>c.checked=true);
+  stratModalEl("strat-nopairs").onclick=()=>document.querySelectorAll("#strat-pairs input").forEach(c=>c.checked=false);
+  stratModalEl("stratmodal").addEventListener("click",e=>{ if(e.target.id==="stratmodal") closeStratModal(); });
 }
 
 // query-string fragment that pins every data call to the loaded strategy
@@ -2788,6 +3010,7 @@ function updateSendState(){ const s=document.getElementById("send"); if(s.classL
   document.getElementById("legendtoggle").classList.toggle("active", SHOW_LEGEND);
   await loadPairs();
   await loadDumpStrategies();
+  wireStratModal();
   await loadData(CUR_PAIR);
   await loadModels();
   document.getElementById("tfsel").value = TF;   // sync dropdown to default TF (15m)
