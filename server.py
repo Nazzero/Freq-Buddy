@@ -1329,11 +1329,55 @@ def api_chat_new():
 # a freqtrade strategy that merges the precomputed dump, run it, and return stats +
 # trades. Long-running, so it's a background job polled by the UI.
 import backtest as _bt
+import dumpjobs as _dj
 
 
 @app.get("/api/strategies")
 def api_strategies():
     return {"strategies": _bt.list_strategies()}
+
+
+# ---------- indicator-dump management (strategy selector +/gear) ----------
+@app.get("/api/dumpable_pairs")
+def api_dumpable_pairs():
+    """Pairs with downloaded 15m base data (csv form) that can be dumped."""
+    return {"pairs": _dj.dumpable_pairs()}
+
+
+class DumpReq(BaseModel):
+    strategy: str
+    pairs: list[str] = []
+    timerange: str | None = None
+
+
+@app.post("/api/dump_jobs")
+def api_start_dump(req: DumpReq):
+    pairs = _dj._valid_pairs(req.pairs)
+    bad = _dj.validate_dump(req.strategy, pairs, req.timerange)
+    if bad:
+        return JSONResponse({"ok": False, "error": bad}, status_code=400)
+    job_id = _dj.start_dump_job(req.strategy, pairs, req.timerange or None)
+    return {"ok": True, "job_id": job_id}
+
+
+@app.get("/api/dump_jobs/{job_id}")
+def api_dump_status(job_id: str):
+    return _dj.dump_status(job_id)
+
+
+@app.get("/api/dump_registry/{strategy}")
+def api_dump_registry(strategy: str):
+    entry = _dj.registry_get(strategy)
+    return {"ok": True, "entry": entry}
+
+
+@app.delete("/api/dump_strategies/{strategy}")
+def api_delete_dump_strategy(strategy: str):
+    err = _dj.delete_strategy(strategy)
+    if err:
+        return JSONResponse({"ok": False, "error": err}, status_code=400)
+    _cache.clear()  # drop any cached frames for the removed strategy
+    return {"ok": True}
 
 
 class BacktestSpec(BaseModel):

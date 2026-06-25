@@ -3,14 +3,17 @@
 
 Reads the project config + a strategy, populates indicators (with informative
 timeframe merges via a real DataProvider), and writes one CSV per pair to
-user_data/indicator_dumps/<PAIR>_indicators.csv.
+<out-root>/<Strategy>/<PAIR>_indicators.csv.
 
-Run inside the freqtrade docker container:
-  docker compose run --rm --entrypoint python3 freqtrade \
-    user_data/../chartsidekick/dump_indicators.py --strategy Vaultwave
+Runs on the host venv (the chartsidekick server drives it via subprocess):
+  .venv/bin/python chartsidekick/dump_indicators.py --strategy Vaultwave
+
+Progress: prints one "[i/N] PAIR ..." line per pair plus a final "done" so the
+server can stream a progress bar.
 """
 import argparse
 import logging
+import sys
 from pathlib import Path
 
 logging.basicConfig(level=logging.WARNING)
@@ -30,16 +33,56 @@ SIDEKICK_PAIRS = {
     "LINK/USDT:USDT": "LINK_USDT_USDT",
 }
 
-OUT_ROOT = Path("/freqtrade/user_data/indicator_dumps")
+# Default config + output root resolve to this project unless overridden.
+PROJECT = Path(__file__).resolve().parent.parent
+DEFAULT_CONFIG = PROJECT / "user_data" / "config.json"
+DEFAULT_OUT_ROOT = PROJECT / "user_data" / "indicator_dumps"
+
+
+def _csv_to_ccxt(csv_pair: str) -> str:
+    """BTC_USDT_USDT -> BTC/USDT:USDT (reverse of SIDEKICK_PAIRS)."""
+    for ccxt, csv in SIDEKICK_PAIRS.items():
+        if csv == csv_pair:
+            return ccxt
+    parts = csv_pair.split("_")
+    if len(parts) == 3:
+        return f"{parts[0]}/{parts[1]}:{parts[2]}"
+    if len(parts) == 2:
+        return f"{parts[0]}/{parts[1]}"
+    return csv_pair
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--config", default="/freqtrade/user_data/config.json")
+    ap.add_argument("--config", default=str(DEFAULT_CONFIG))
     ap.add_argument("--strategy", default="Vaultwave")
+    ap.add_argument("--out-root", default=str(DEFAULT_OUT_ROOT),
+                    help="root dir for indicator_dumps (default: project user_data/indicator_dumps)")
+    ap.add_argument("--pairs", default=None,
+                    help="comma-separated subset of pairs to dump (ccxt BTC/USDT:USDT or csv BTC_USDT_USDT). "
+                         "Default: all sidekick pairs.")
     ap.add_argument("--timerange", default=None,
                     help="optional freqtrade timerange, e.g. 20240101-20250501")
     args = ap.parse_args()
+
+    # Resolve the pair set (subset support). Accept both ccxt and csv forms.
+    if args.pairs:
+        want = {p.strip() for p in args.pairs.split(",") if p.strip()}
+        ccxt_want = set()
+        for p in want:
+            ccxt_want.add(_csv_to_ccxt(p) if "/" not in p else p)
+        pair_map = {c: v for c, v in SIDEKICK_PAIRS.items() if c in ccxt_want}
+        # allow pairs not in the canonical map (any downloaded pair)
+        for c in ccxt_want:
+            if c not in pair_map:
+                csv_pair = c.replace("/", "_").replace(":", "_")
+                pair_map[c] = csv_pair
+    else:
+        pair_map = dict(SIDEKICK_PAIRS)
+
+    if not pair_map:
+        print("[err] no valid pairs to dump", flush=True)
+        sys.exit(2)
 
     overrides = {
         "strategy": args.strategy,
@@ -50,33 +93,32 @@ def main():
 
     config = Configuration.from_files([args.config])
     config.update(overrides)
-    # Restrict to the pairs the sidekick plots that actually have data.
-    config["pairs"] = list(SIDEKICK_PAIRS.keys())
-    config["exchange"]["pair_whitelist"] = list(SIDEKICK_PAIRS.keys())
+    config["pairs"] = list(pair_map.keys())
+    config["exchange"]["pair_whitelist"] = list(pair_map.keys())
 
     bt = Backtesting(config)
     data, _timerange = bt.load_bt_data()
-    # Activate the resolved strategy; this wires the DataProvider in so
-    # informative timeframe lookups (1h/2h) inside populate_indicators work.
     strategy = bt.strategylist[0]
     bt._set_strategy(strategy)
 
-    # Per-strategy subdir so the frontend can pick which strategy's
-    # indicators to load: indicator_dumps/<Strategy>/<PAIR>_indicators.csv
-    out_dir = OUT_ROOT / args.strategy
+    out_dir = Path(args.out_root) / args.strategy
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    for pair, csv_pair in SIDEKICK_PAIRS.items():
+    total = len(pair_map)
+    print(f"start strategy={args.strategy} pairs={total}", flush=True)
+    done = 0
+    for i, (pair, csv_pair) in enumerate(pair_map.items(), 1):
         df = data.get(pair)
         if df is None or df.empty:
-            print(f"[skip] {pair}: no base-timeframe data loaded")
+            print(f"[{i}/{total}] skip {csv_pair}: no base-timeframe data", flush=True)
             continue
         out = strategy.advise_indicators(df.copy(), {"pair": pair})
         out_path = out_dir / f"{csv_pair}_indicators.csv"
         out.to_csv(out_path, index=False)
-        print(f"[ok] {csv_pair}: {len(out)} rows, {len(out.columns)} cols -> {out_path}")
+        done += 1
+        print(f"[{i}/{total}] ok {csv_pair}: {len(out)} rows, {len(out.columns)} cols", flush=True)
 
-    print("done")
+    print(f"done dumped={done}/{total}", flush=True)
 
 
 if __name__ == "__main__":
