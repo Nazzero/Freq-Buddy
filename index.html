@@ -2805,7 +2805,10 @@ function updateSendState(){ const s=document.getElementById("send"); if(s.classL
     }
     return true;
   });
-  gd.on("plotly_click", onPlotClick);
+  // measure tool: free placement anywhere on the price pane (TradingView style),
+  // so use raw DOM clicks + pixel->data conversion rather than snapped plotly_click.
+  gd.addEventListener("click", onPlotClick);
+  gd.addEventListener("mousemove", onMeasureMove);
   installWheelZoom();
   installYZone();
   installSubsplit();
@@ -2814,18 +2817,32 @@ function updateSendState(){ const s=document.getElementById("send"); if(s.classL
 })();
 
 /* ---- measure tool (TradingView style) ----------------------------------- */
-function onPlotClick(d){
+// Convert a mouse event into free price-pane data coords {x, y} (NOT snapped to
+// a candle/data point), or null if the click is outside the price pane.
+function _measCoords(ev){
+  const fl=gd._fullLayout; if(!fl||!fl.xaxis||!fl.yaxis) return null;
+  const xa=fl.xaxis, ya=fl.yaxis;
+  if(xa._offset==null || ya._offset==null) return null;
+  const bb=gd.getBoundingClientRect();
+  const px=ev.clientX-bb.left-xa._offset;
+  const py=ev.clientY-bb.top -ya._offset;
+  // keep inside the price pane (x within plot width, y within price-axis height)
+  if(px<0 || px>xa._length) return null;
+  if(py<0 || py>ya._length) return null;
+  return { x: xa.p2d(px), y: ya.p2d(py) };
+}
+function onPlotClick(ev){
   if(!MEASURE) return;
-  const p = d && d.points && d.points[0];
-  if(!p) return;
-  // only measure on the price axis (yaxis === "y"); ignore subplot clicks
-  if(p.yaxis && p.yaxis._id && p.yaxis._id!=="y") return;
-  const x = p.x;
-  const y = (p.close!=null ? p.close : (p.y!=null ? p.y : null)); // candle -> close, line -> y
-  if(y==null) return;
-  if(!MEASURE_A){ MEASURE_A={x, y}; drawMeasure(MEASURE_A, null); return; }
-  drawMeasure(MEASURE_A, {x, y});
+  const c=_measCoords(ev); if(!c) return;
+  if(!MEASURE_A){ MEASURE_A={x:c.x, y:c.y}; drawMeasure(MEASURE_A, null); return; }
+  drawMeasure(MEASURE_A, c);
   MEASURE_A=null;            // ready for a fresh measurement on next click
+}
+// live preview of the second leg while the first point is set
+function onMeasureMove(ev){
+  if(!MEASURE || !MEASURE_A) return;
+  const c=_measCoords(ev); if(!c) return;
+  drawMeasure(MEASURE_A, c);
 }
 function _barsBetween(x0, x1){
   // count actual bars in the loaded slice between the two x values
