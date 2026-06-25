@@ -1339,6 +1339,7 @@ function render(preserveRange){
     traces.push({type:"scatter", mode:"lines", x, y:V[n], name:n, xaxis:"x", yaxis:ax,
       visible: cfg.hidden ? "legendonly" : true,
       opacity: cfg.opacity!=null ? cfg.opacity : 1,
+      ...(((MEASURE || RULER) && !HOVER) ? {hoverinfo:"none"} : {}),
       line:{width:(cfg.width!=null ? cfg.width : 1.3), color:cfg.color}});
   });
 
