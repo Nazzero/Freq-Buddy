@@ -271,16 +271,19 @@ def slice_window(df: pd.DataFrame, start: str | None, end: str | None,
 # --------------------------------------------------------------------------- #
 # caching
 # --------------------------------------------------------------------------- #
-def profile_path(pair: str) -> Path:
-    return CACHE_DIR / f"{pair}_profile.json"
+def profile_path(pair: str, tag: str = "") -> Path:
+    suffix = f"__{tag}" if tag else ""
+    return CACHE_DIR / f"{pair}{suffix}_profile.json"
 
 
 INDEX_PATH = CACHE_DIR / "indicator_index.json"
 
 
-def load_or_build_profile(pair: str, df_loader) -> dict:
-    p = profile_path(pair)
-    csv = PROJECT / "user_data" / "indicator_dumps" / f"{pair}_indicators.csv"
+def load_or_build_profile(pair: str, df_loader, csv_path: Path | None = None,
+                          tag: str = "") -> dict:
+    p = profile_path(pair, tag)
+    csv = csv_path or (PROJECT / "user_data" / "indicator_dumps" /
+                       f"{pair}_indicators.csv")
     if p.exists() and csv.exists() and p.stat().st_mtime >= csv.stat().st_mtime:
         try:
             return json.loads(p.read_text())

@@ -30,7 +30,7 @@ SIDEKICK_PAIRS = {
     "LINK/USDT:USDT": "LINK_USDT_USDT",
 }
 
-OUT_DIR = Path("/freqtrade/user_data/indicator_dumps")
+OUT_ROOT = Path("/freqtrade/user_data/indicator_dumps")
 
 
 def main():
@@ -61,7 +61,10 @@ def main():
     strategy = bt.strategylist[0]
     bt._set_strategy(strategy)
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    # Per-strategy subdir so the frontend can pick which strategy's
+    # indicators to load: indicator_dumps/<Strategy>/<PAIR>_indicators.csv
+    out_dir = OUT_ROOT / args.strategy
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     for pair, csv_pair in SIDEKICK_PAIRS.items():
         df = data.get(pair)
@@ -69,7 +72,7 @@ def main():
             print(f"[skip] {pair}: no base-timeframe data loaded")
             continue
         out = strategy.advise_indicators(df.copy(), {"pair": pair})
-        out_path = OUT_DIR / f"{csv_pair}_indicators.csv"
+        out_path = out_dir / f"{csv_pair}_indicators.csv"
         out.to_csv(out_path, index=False)
         print(f"[ok] {csv_pair}: {len(out)} rows, {len(out.columns)} cols -> {out_path}")
 

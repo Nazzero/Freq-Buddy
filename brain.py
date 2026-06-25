@@ -48,7 +48,27 @@ Available chart actions (op + args). Return only ops you actually need.
                                        you have what you need (the loop is capped).
 - mark {markers:[{date,price,confirmed?}], label}  plot event markers on the chart (visual confirm). You normally DON'T fill this yourself; markers from a data query get attached automatically.
 - clear_marks {}                       remove event markers
-"""
+- draw_arrow {x, y, text?, ax?, ay?, color?}  draw an ARROW pointing AT a chart point to call it out. x = ISO date
+                                       (e.g. "2024-08-04T12:00:00"), y = price/value on that axis. text = optional short
+                                       label rendered at the arrow tail. Omit ax/ay and the arrow auto-points down at (x,y)
+                                       from just above it (best default). Give ax/ay (also date,value) to set a custom tail
+                                       so the arrow points from there to (x,y). color optional "#rrggbb" (default amber).
+- draw_box {x0, x1, y0, y1, text?, color?, fill?}  draw a RECTANGLE to highlight a region/zone. x0,x1 = ISO dates
+                                       (the time span), y0,y1 = price/value bounds. text = optional label at the top-left.
+                                       fill = optional "rgba(...)". Use to circle/box a setup, a consolidation, a breakout zone.
+- draw_line {x0, y0, x1, y1, color?, dash?, width?}  draw a straight line (trendline, support/resistance, level).
+                                       dash: "solid"|"dash"|"dot". For a horizontal level use the same y0=y1 across two dates.
+- add_label {x, y, text, color?, anchor?, size?}  place a floating text label at a chart point (no arrow). anchor:
+                                       "left"|"center"|"right".
+- clear_drawings {}                    remove ALL AI/user drawings (arrows, boxes, lines, labels). Use before redrawing.
+
+DRAWING TO CALL OUT POINTS: when the user asks you to "mark", "point to", "highlight", "circle", "show me where",
+"call out", "draw on the chart", or to visually explain a setup/pattern, USE these draw_* ops to annotate the chart
+directly so the answer is visual, not just text. Pick coordinates from the REAL data (the visible date range + the
+indicator/price values you computed or saw in the screenshot). Typical pattern: draw_box around the region of interest
++ draw_arrow pointing at the key bar with a short text label, then briefly describe what you drew. Use draw_line for
+trendlines/levels. You can combine several draw_* ops in one turn for a detailed callout. Clear old drawings with
+clear_drawings first if you are redrawing. After drawing you MAY request_screenshot to confirm placement looks right."""
 
 # Analyst grounding tools. The brain CANNOT ingest the raw 42k x 159 CSV. Instead
 # it is given a compact statistical PROFILE every turn and may FETCH deeper detail
@@ -720,11 +740,14 @@ def http_get_q(path, params):
     return http_get(path + "?" + urlencode(params))
 
 
-def get_profile_text(pair: str) -> str:
+def get_profile_text(pair: str, strategy: str | None = None) -> str:
     """Compact statistical profile of the full dataset (~2.4k tokens), cached
     server-side. Always injected so the brain is grounded in the real data shape."""
     try:
-        r = http_get_q("/api/profile_text", {"pair": pair})
+        params = {"pair": pair}
+        if strategy:
+            params["strategy"] = strategy
+        r = http_get_q("/api/profile_text", params)
         if r.get("ok"):
             rng = r.get("date_range") or ["?", "?"]
             return (f"DATA PROFILE for {pair} ({r.get('rows')} bars, {rng[0]}..{rng[1]}). "
@@ -735,7 +758,7 @@ def get_profile_text(pair: str) -> str:
     return ""
 
 
-def resolve_fetches(fetches: list, pair: str) -> str:
+def resolve_fetches(fetches: list, pair: str, strategy: str | None = None) -> str:
     """Resolve the brain's fetch requests against REAL code/data and return the
     material as text to feed back into the next decide pass."""
     out = []
@@ -761,11 +784,14 @@ def resolve_fetches(fetches: list, pair: str) -> str:
                     out.append(f"STRATEGY {f.get('file')}: {r.get('error')}")
             elif kind == "slice":
                 cols = f.get("cols")
-                r = http_get_q("/api/slice", {
+                sp = {
                     "pair": pair, "start": f.get("start") or "",
                     "end": f.get("end") or "",
                     "cols": ",".join(cols) if isinstance(cols, list) else (cols or ""),
-                    "max_rows": f.get("max_rows", 60)})
+                    "max_rows": f.get("max_rows", 60)}
+                if strategy:
+                    sp["strategy"] = strategy
+                r = http_get_q("/api/slice", sp)
                 if r.get("ok"):
                     out.append(f"RAW SLICE ({r['n']} rows, cols {r['columns']}):\n"
                                + json.dumps(r["rows"], default=str)[:4000])
@@ -781,14 +807,15 @@ def decide(msg: dict) -> dict:
     state = msg.get("chart_state", {})
     model = msg.get("model")
     pair = state.get("pair") or "BTC_USDT_USDT"
-    log_event(mid, "received", msg.get("text", "")[:200], {"pair": pair, "model": model})
+    strategy = state.get("strategy") or None
+    log_event(mid, "received", msg.get("text", "")[:200], {"pair": pair, "strategy": strategy, "model": model})
     convo = _format_history(msg.get("history") or [])
     shot = state.get("screenshot_path")
     shot_note = ""
     if shot and os.path.exists(shot):
         shot_note = ("\n\nCHART SCREENSHOT: a PNG of the user's current chart view is at this path. "
                      "Read it to SEE the chart before answering.\nImage path: " + shot + "\n")
-    profile = get_profile_text(pair)
+    profile = get_profile_text(pair, strategy)
     base_prompt = (
         SYS + "\n\n" + OPS_DOC + "\n\n" + ANALYST_DOC +
         "\n\n" + profile +
@@ -826,7 +853,7 @@ def decide(msg: dict) -> dict:
         if not last_hop and isinstance(fetches, list) and fetches and not result.get("query"):
             log_event(mid, "fetch", f"fetching {len(fetches)} item(s): "
                       + ", ".join(str(f.get('get') or f) for f in fetches)[:200])
-            material = resolve_fetches(fetches, pair)
+            material = resolve_fetches(fetches, pair, strategy)
             fetched_ctx += ("\n\nFETCHED MATERIAL (use this to ground your answer/query):\n"
                             + material)
             continue
@@ -870,6 +897,8 @@ def decide(msg: dict) -> dict:
     if isinstance(query, dict) and query.get("op"):
         check_cancel(mid)
         query.setdefault("pair", pair)
+        if strategy:
+            query.setdefault("strategy", strategy)
         apply_visible_range(query, state)  # analysis range == chart zoom unless user pinned dates
         log_event(mid, "op", f"running {query.get('op')}", {"query": json.dumps(query, default=str)[:600]})
         logic_echo = (result.get("reply") or "").strip()  # PASS-1 English logic, for recipe echo

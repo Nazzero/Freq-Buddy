@@ -47,6 +47,8 @@
   .tb-text .caret-s{ color:var(--text-3); font-size:11px; }
   #pair{ background:transparent; color:var(--text); border:1px solid transparent; font-weight:600; font-family:var(--mono); letter-spacing:.3px; padding:5px 8px; border-radius:var(--r-sm); font-size:12px; cursor:pointer; }
   #pair:hover{ background:var(--panel-2); }
+  #stratsel{ background:transparent; color:var(--text-2); border:1px solid var(--border); font-weight:600; font-family:var(--mono); letter-spacing:.3px; padding:5px 8px; border-radius:var(--r-sm); font-size:11px; cursor:pointer; }
+  #stratsel:hover{ background:var(--panel-2); color:var(--text); }
   /* toolbar select (timeframe) */
   .tb-sel{ background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:var(--r-sm); padding:5px 8px; font:inherit; font-size:13px; font-weight:600; cursor:pointer; flex:0 0 auto; }
   .tb-sel:hover{ border-color:var(--accent-line); }
@@ -549,12 +551,13 @@
         Backtest
       </button>
       <select id="pair" title="pair"></select>
+      <select id="stratsel" title="strategy (which indicator set to load)"></select>
       <span class="tb-sp"></span>
-      <button class="tb-ico" id="resetzoom" title="undo / reset zoom">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
+      <button class="tb-ico" id="resetzoom" title="reset zoom (fit all)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
       </button>
-      <button class="tb-ico" id="reload" title="redo / reload data">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h1"/></svg>
+      <button class="tb-ico" id="reload" title="reload data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
       </button>
       <span class="tb-div"></span>
       <button class="tb-ico" id="snapbtn" title="screenshot chart">
@@ -567,7 +570,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/></svg>
         </button>
         <button class="rail" id="measurebtn" title="measure tool: click two points">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.4" y="8.4" width="19.2" height="7.2" rx="1" transform="rotate(-45 12 12)"/><path d="M9.1 6.9l1.8 1.8M11.6 9.4l1 1M12.7 4.5l1.8 1.8M15.2 7l1 1M16.3 2.1l1.8 1.8"/></svg>
+          <svg viewBox="0 0 122.88 122.88" fill="currentColor"><path d="M0.92,32.82l31.9-31.9C33.44,0.3,34.24,0,35.05,0c0.8,0,1.61,0.3,2.22,0.92l84.69,84.69c0.61,0.61,0.92,1.42,0.92,2.23 c0,0.8-0.31,1.6-0.92,2.21l-0.01,0.01l0.01,0.01l-31.9,31.9c-0.62,0.62-1.42,0.92-2.23,0.92c-0.8,0-1.61-0.3-2.23-0.92L0.92,37.27 C0.3,36.65,0,35.84,0,35.05C0,34.24,0.3,33.44,0.92,32.82L0.92,32.82z M105.32,77.15L90.84,91.63c-1.13,1.13-2.84,1.26-3.81,0.29 c-0.97-0.97-0.84-2.68,0.29-3.81l14.48-14.48L90.12,61.94l-6.86,6.85c-1.13,1.13-2.84,1.26-3.81,0.29 c-0.97-0.97-0.84-2.68,0.29-3.81l6.86-6.86L75.88,47.71L61.4,62.19c-1.13,1.13-2.84,1.26-3.81,0.29c-0.97-0.97-0.84-2.68,0.29-3.81 l14.48-14.48L61.09,32.91l-6.86,6.85c-1.13,1.13-2.84,1.26-3.81,0.29c-0.97-0.97-0.84-2.68,0.29-3.81l6.86-6.86L46.43,18.26 L31.95,32.74c-1.13,1.13-2.83,1.25-3.8,0.29c-0.97-0.97-0.84-2.67,0.29-3.8l14.48-14.48l-7.87-7.87L6.87,35.05l80.96,80.96 l28.17-28.17C102.8,74.62,118.53,90.36,105.32,77.15L105.32,77.15z"/></svg>
         </button>
         <div class="drawgroup">
           <button class="rail" id="drawbtn" title="drawing tools">
@@ -843,6 +846,7 @@ let DATA = null;
 let COLS = {ohlcv:[], indicators:[]};
 let RANGES = {};             // name -> {bucket,min,max}
 let CUR_PAIR = null;
+let CUR_STRAT = null;        // which strategy's indicator dump is loaded
 let FULL_RANGE = null;
 let CUR_RANGE = null;
 const MAX_POINTS_CAP = 12000;   // hard ceiling so high-res TFs stay plottable
@@ -859,6 +863,7 @@ let MEASURE = false;         // measure-tool armed
 let MEASURE_A = null;        // first clicked point {x, y}
 let DRAW_MODE = null;        // null=pan | "drawopenpath"|"drawline"|"drawrect"|"eraseshape" — Plotly dragmode for drawing
 const DRAW_COLOR = "#22d3ee";// accent for user drawings (visible in the AI screenshot)
+const AI_DRAW_COLOR = "#f59e0b";// amber accent for AI callout drawings (distinct from user cyan)
 const PAD_FRAC = 0.18;       // fetch this much extra data outside the view on each side
 let TF = "15m";              // selected display timeframe (resampled client-side from 15m base)
 let CANDLE_TYPE = "candles"; // "candles" | "heikin" | "hidden"
@@ -1030,9 +1035,27 @@ async function loadPairs(){
   CUR_PAIR=j.pairs[0]; sel.value=CUR_PAIR;
 }
 
+async function loadDumpStrategies(){
+  const sel=document.getElementById("stratsel");
+  if(!sel) return;
+  try{
+    const j=await fetch(API+"/api/dump_strategies").then(r=>r.json());
+    const strats=j.strategies||[];
+    sel.innerHTML="";
+    strats.forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;sel.appendChild(o);});
+    CUR_STRAT=j.current||strats[0]||null;
+    if(CUR_STRAT) sel.value=CUR_STRAT;
+    // hide the selector if there's only one (or zero) choice — nothing to pick.
+    sel.style.display = strats.length>1 ? "" : "none";
+  }catch(e){ CUR_STRAT=null; sel.style.display="none"; }
+}
+
+// query-string fragment that pins every data call to the loaded strategy
+function stratQS(){ return CUR_STRAT ? "&strategy="+encodeURIComponent(CUR_STRAT) : ""; }
+
 async function fetchData(pair, start, end){
   // Server resamples to the selected TF first, then downsamples only if needed.
-  let u=API+"/api/data?pair="+encodeURIComponent(pair)+"&tf="+encodeURIComponent(TF)+"&max_points="+MAX_POINTS_CAP;
+  let u=API+"/api/data?pair="+encodeURIComponent(pair)+"&tf="+encodeURIComponent(TF)+"&max_points="+MAX_POINTS_CAP+stratQS();
   if(start) u+="&start="+encodeURIComponent(start);
   if(end)   u+="&end="+encodeURIComponent(end);
   return fetch(u).then(r=>r.json());
@@ -1043,9 +1066,9 @@ async function loadData(pair){
   CUR_PAIR=pair; CUR_RANGE=null;
   const psel=document.getElementById("pair"); if(psel && psel.value!==pair) psel.value=pair;
   const [c,d,rg]=await Promise.all([
-    fetch(API+"/api/columns?pair="+pair).then(r=>r.json()),
+    fetch(API+"/api/columns?pair="+pair+stratQS()).then(r=>r.json()),
     fetchData(pair, null, null),
-    fetch(API+"/api/ranges?pair="+pair).then(r=>r.json()),
+    fetch(API+"/api/ranges?pair="+pair+stratQS()).then(r=>r.json()),
   ]);
   COLS=c; DATA=d; RANGES=rg;
   FULL_RANGE=[DATA.date[0], DATA.date[DATA.date.length-1]];
@@ -1702,6 +1725,66 @@ const OPS = {
   },
   clear_marks: ()=>{ MARKERS=[]; MARKER_LABEL="";
     OVERLAYS=OVERLAYS.filter(o=>o.kind!=="analysis"); syncOverlays(); },
+
+  // ---- AI callout drawings (arrows / boxes / lines / text labels) ----
+  // These reuse the same _arrow / _draw tag system as the manual drawing tools,
+  // so they survive pan/zoom and appear in the screenshot the AI sees next turn.
+  draw_arrow: (a)=>{
+    if(!a||a.x==null||a.y==null) return;
+    const col=a.color||AI_DRAW_COLOR;
+    // tail offset: arrow points AT (x,y); tail sits up-and-left unless caller gives ax/ay
+    const ax = a.ax!=null ? a.ax : a.x;
+    const ay = a.ay!=null ? a.ay : a.y;
+    const auto = (a.ax==null && a.ay==null);   // no explicit tail -> use pixel offset so it always points down at the bar
+    const ann = {
+      x:a.x, y:a.y, xref:"x", yref:"y",
+      showarrow:true, arrowhead:3, arrowsize:1.4, arrowwidth:2.4, arrowcolor:col,
+      text:a.text||"", font:{color:col, size:12}, bgcolor:a.text?"rgba(10,10,10,0.7)":"rgba(0,0,0,0)",
+      bordercolor:a.text?col:"rgba(0,0,0,0)", borderpad:a.text?3:0,
+      _arrow:true,
+    };
+    if(auto){ ann.ax=0; ann.ay=-46; }   // pixel offset (points up); standoff keeps head off the candle
+    else { ann.ax=ax; ann.ay=ay; ann.axref="x"; ann.ayref="y"; }
+    if(a.standoff!=null) ann.standoff=a.standoff;
+    const anns=(gd.layout&&gd.layout.annotations||[]).slice(); anns.push(ann);
+    Plotly.relayout(gd,{annotations:anns});
+  },
+  draw_box: (a)=>{
+    if(!a||a.x0==null||a.x1==null||a.y0==null||a.y1==null) return;
+    const col=a.color||AI_DRAW_COLOR;
+    const sh={type:"rect", xref:"x", yref:"y", x0:a.x0, x1:a.x1, y0:a.y0, y1:a.y1,
+      line:{color:col, width:2}, fillcolor:a.fill||"rgba(245,158,11,0.10)", layer:"above", _draw:true};
+    const shapes=(gd.layout&&gd.layout.shapes||[]).slice(); shapes.push(sh);
+    const relay={shapes};
+    if(a.text){
+      const anns=(gd.layout&&gd.layout.annotations||[]).slice();
+      anns.push({x:a.x0, y:a.y1, xref:"x", yref:"y", showarrow:false, xanchor:"left", yanchor:"bottom",
+        text:a.text, font:{color:col, size:12}, bgcolor:"rgba(10,10,10,0.7)", bordercolor:col, borderpad:3, _arrow:true});
+      relay.annotations=anns;
+    }
+    Plotly.relayout(gd,relay);
+  },
+  draw_line: (a)=>{
+    if(!a||a.x0==null||a.x1==null||a.y0==null||a.y1==null) return;
+    const col=a.color||AI_DRAW_COLOR;
+    const sh={type:"line", xref:"x", yref:"y", x0:a.x0, x1:a.x1, y0:a.y0, y1:a.y1,
+      line:{color:col, width:a.width||2, dash:a.dash||"solid"}, layer:"above", _draw:true};
+    const shapes=(gd.layout&&gd.layout.shapes||[]).slice(); shapes.push(sh);
+    Plotly.relayout(gd,{shapes});
+  },
+  add_label: (a)=>{
+    if(!a||a.x==null||a.y==null||!a.text) return;
+    const col=a.color||AI_DRAW_COLOR;
+    const anns=(gd.layout&&gd.layout.annotations||[]).slice();
+    anns.push({x:a.x, y:a.y, xref:"x", yref:"y", showarrow:false, xanchor:a.anchor||"center", yanchor:"middle",
+      text:a.text, font:{color:col, size:a.size||12}, bgcolor:"rgba(10,10,10,0.72)", bordercolor:col, borderpad:4, _arrow:true});
+    Plotly.relayout(gd,{annotations:anns});
+  },
+  clear_drawings: ()=>{
+    const keep=(gd.layout&&gd.layout.shapes||[]).filter(s=>s._meas||s._div);
+    const akeep=(gd.layout&&gd.layout.annotations||[]).filter(a=>a._meas);
+    Plotly.relayout(gd,{shapes:keep, annotations:akeep});
+  },
 };
 function markCount(a){
   if(a&&a.groups) return a.groups.reduce((s,g)=>s+((g.markers||[]).length),0);
@@ -1728,6 +1811,11 @@ const OP_LABELS = {
   pan:                 a=>["↔","Panned"],
   mark:                a=>["⌖",markCount(a)+" markers placed"],
   clear_marks:         ()=>["×","Cleared markers"],
+  draw_arrow:          a=>["↗","Arrow"+(a.text?" \""+a.text+"\"":"")],
+  draw_box:            a=>["▢","Box"+(a.text?" \""+a.text+"\"":"")],
+  draw_line:           a=>["╱","Line drawn"],
+  add_label:           a=>["A","Label \""+(a.text||"")+"\""],
+  clear_drawings:      ()=>["×","Cleared drawings"],
 };
 async function runActions(actions){
   const row=document.createElement("div"); row.className="acts";
@@ -1761,7 +1849,7 @@ function chartState(){
   const xr = gd.layout && gd.layout.xaxis ? gd.layout.xaxis.range : null;
   const shown={}; ACTIVE.forEach((c,n)=>shown[n]={place:c.place,color:c.color});
   return {
-    pair: CUR_PAIR, visible_x: xr, autoscale: AUTOSCALE,
+    pair: CUR_PAIR, strategy: CUR_STRAT, visible_x: xr, autoscale: AUTOSCALE,
     shown, favorites:[...FAVS], presets:Object.keys(PRESETS),
     n_bars: DATA?DATA._n_total:0,
     date_min: FULL_RANGE?FULL_RANGE[0]:null, date_max: FULL_RANGE?FULL_RANGE[1]:null,
@@ -2092,6 +2180,7 @@ inputEl.addEventListener("keydown",e=>{
 });
 inputEl.addEventListener("blur",()=>setTimeout(hideAC,120));
 document.getElementById("pair").onchange=e=>loadData(e.target.value);
+document.getElementById("stratsel").onchange=e=>{ CUR_STRAT=e.target.value; loadData(CUR_PAIR); };
 document.getElementById("reload").onclick=()=>loadData(CUR_PAIR);
 document.getElementById("resetzoom").onclick=()=>{ Plotly.relayout(gd,{"xaxis.autorange":true,"yaxis.autorange":true}); reloadSlice(null,null); };
 document.getElementById("ymodebtn").onclick=()=>cycleYMode();
@@ -2699,6 +2788,7 @@ function updateSendState(){ const s=document.getElementById("send"); if(s.classL
   syncCrosshairRail();
   document.getElementById("legendtoggle").classList.toggle("active", SHOW_LEGEND);
   await loadPairs();
+  await loadDumpStrategies();
   await loadData(CUR_PAIR);
   await loadModels();
   document.getElementById("tfsel").value = TF;   // sync dropdown to default TF (15m)

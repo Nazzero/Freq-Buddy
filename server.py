@@ -32,7 +32,7 @@ import analyst
 
 ROOT = Path(__file__).resolve().parent
 PROJECT = ROOT.parent
-DUMP_DIR = PROJECT / "user_data" / "indicator_dumps"
+DUMP_ROOT = PROJECT / "user_data" / "indicator_dumps"
 SHOT_DIR = ROOT / "shots"        # chart screenshots the AI can look at
 SHOT_DIR.mkdir(exist_ok=True)
 
@@ -40,6 +40,39 @@ PAIRS = [
     "BTC_USDT_USDT", "ETH_USDT_USDT", "SOL_USDT_USDT", "XRP_USDT_USDT",
     "BNB_USDT_USDT", "DOGE_USDT_USDT", "LINK_USDT_USDT",
 ]
+
+
+def list_dump_strategies() -> list[str]:
+    """Strategies that have indicator dumps on disk, newest-modified first.
+
+    Each strategy is a subdir of indicator_dumps/ holding <PAIR>_indicators.csv.
+    Legacy flat dumps directly under indicator_dumps/ surface as "default".
+    """
+    out = []
+    if any(DUMP_ROOT.glob("*_indicators.csv")):
+        out.append("default")
+    subs = [d for d in DUMP_ROOT.iterdir()
+            if d.is_dir() and any(d.glob("*_indicators.csv"))]
+    subs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
+    out.extend(d.name for d in subs)
+    return out
+
+
+def resolve_strategy(strategy: str | None) -> str:
+    """Pick a usable strategy: requested one if it has data, else the first
+    available (newest dumps), else 'default'."""
+    avail = list_dump_strategies()
+    if strategy and strategy in avail:
+        return strategy
+    return avail[0] if avail else "default"
+
+
+def dump_path(pair: str, strategy: str | None) -> Path:
+    strat = resolve_strategy(strategy)
+    if strat == "default":
+        return DUMP_ROOT / f"{pair}_indicators.csv"
+    return DUMP_ROOT / strat / f"{pair}_indicators.csv"
+
 
 app = FastAPI(title="Chart Sidekick")
 
@@ -77,15 +110,26 @@ def list_models() -> list[str]:
     return _models_cache["models"]  # type: ignore[return-value]
 
 
-def load_pair(pair: str) -> pd.DataFrame:
-    path = DUMP_DIR / f"{pair}_indicators.csv"
+def load_pair(pair: str, strategy: str | None = None) -> pd.DataFrame:
+    path = dump_path(pair, strategy)
+    key = str(path)
     mtime = path.stat().st_mtime
-    cached = _cache.get(pair)
+    cached = _cache.get(key)
     if cached is None or cached[0] != mtime:
         df = pd.read_csv(path)
         df["date"] = pd.to_datetime(df["date"], utc=True)
-        _cache[pair] = (mtime, df)
-    return _cache[pair][1]
+        _cache[key] = (mtime, df)
+    return _cache[key][1]
+
+
+def profile_for(pair: str, strategy: str | None) -> dict:
+    """Build/load the analyst profile for a pair under a given strategy,
+    keying the cache + mtime check on that strategy's CSV."""
+    strat = resolve_strategy(strategy)
+    csv = dump_path(pair, strat)
+    tag = "" if strat == "default" else strat
+    return analyst.load_or_build_profile(
+        pair, lambda p: load_pair(p, strat), csv_path=csv, tag=tag)
 
 
 def apply_timeframe(df: pd.DataFrame, tf: str) -> pd.DataFrame:
@@ -111,6 +155,14 @@ def api_pairs():
     return {"pairs": PAIRS}
 
 
+@app.get("/api/dump_strategies")
+def api_dump_strategies():
+    """Strategies that have indicator dumps the chart can load, plus the one
+    that should be selected by default (newest dumps)."""
+    strats = list_dump_strategies()
+    return {"strategies": strats, "current": strats[0] if strats else None}
+
+
 @app.get("/api/models")
 def api_models():
     with _model_lock:
@@ -130,20 +182,20 @@ def api_set_model(sel: ModelSel):
 
 
 @app.get("/api/columns")
-def api_columns(pair: str = "BTC_USDT_USDT"):
-    df = load_pair(pair)
+def api_columns(pair: str = "BTC_USDT_USDT", strategy: str | None = None):
+    df = load_pair(pair, strategy)
     ohlcv = ["open", "high", "low", "close", "volume"]
     indicators = [c for c in df.columns if c not in (["date"] + ohlcv)]
     return {"ohlcv": ohlcv, "indicators": indicators}
 
 
 @app.get("/api/ranges")
-def api_ranges(pair: str = "BTC_USDT_USDT"):
+def api_ranges(pair: str = "BTC_USDT_USDT", strategy: str | None = None):
     """Per-indicator value range, used to auto-assign subplots by scale.
 
     bucket: '0-1' | '0-100' | 'price' | 'other'
     """
-    df = load_pair(pair)
+    df = load_pair(pair, strategy)
     ohlcv = ["open", "high", "low", "close", "volume"]
     close_med = float(df["close"].median())
     out = {}
@@ -173,18 +225,18 @@ def api_ranges(pair: str = "BTC_USDT_USDT"):
 # full raw CSV. Exact numbers still come from /api/analyze (deterministic).
 
 @app.get("/api/profile")
-def api_profile(pair: str = "BTC_USDT_USDT"):
+def api_profile(pair: str = "BTC_USDT_USDT", strategy: str | None = None):
     """Statistical fingerprint of every column over the FULL frame (cached).
     ~9k tokens describes 6.7M cells with statistical fidelity."""
-    prof = analyst.load_or_build_profile(pair, load_pair)
+    prof = profile_for(pair, strategy)
     return JSONResponse(prof)
 
 
 @app.get("/api/profile_text")
-def api_profile_text(pair: str = "BTC_USDT_USDT"):
+def api_profile_text(pair: str = "BTC_USDT_USDT", strategy: str | None = None):
     """Compact one-line-per-column profile (+ producing function) for cheap
     always-on prompt grounding (~2.4k tokens)."""
-    prof = analyst.load_or_build_profile(pair, load_pair)
+    prof = profile_for(pair, strategy)
     idx = analyst.load_or_build_index()
     return {"ok": True, "pair": pair, "text": analyst.compact_profile_text(prof, idx),
             "rows": prof.get("rows"), "date_range": prof.get("date_range")}
@@ -214,23 +266,25 @@ def api_strategy_source(file: str, max_lines: int = 600):
 
 @app.get("/api/slice")
 def api_slice(pair: str = "BTC_USDT_USDT", start: str | None = None,
-              end: str | None = None, cols: str | None = None, max_rows: int = 60):
+              end: str | None = None, cols: str | None = None, max_rows: int = 60,
+              strategy: str | None = None):
     """Small raw window for the requested columns (RAG, not full ingest) so the
     brain can see actual behavior over a span without huge token cost."""
-    df = load_pair(pair)
+    df = load_pair(pair, strategy)
     col_list = [c.strip() for c in cols.split(",")] if cols else None
     return JSONResponse(analyst.slice_window(df, start, end, col_list, max_rows))
 
 
 @app.get("/api/data")
 def api_data(pair: str = "BTC_USDT_USDT", start: str | None = None,
-             end: str | None = None, max_points: int = 4000, tf: str = "15m"):
+             end: str | None = None, max_points: int = 4000, tf: str = "15m",
+             strategy: str | None = None):
     """Return series as columnar JSON. Resampled to tf, then downsampled if needed.
 
     OHLC aggregation uses open=first, high=max, low=min, close=last. Indicators
     use last-in-bucket so the chart stays aligned with the displayed candles.
     """
-    df = load_pair(pair)
+    df = load_pair(pair, strategy)
     if start:
         df = df[df["date"] >= pd.Timestamp(start, tz="UTC")]
     if end:
@@ -266,6 +320,7 @@ def api_data(pair: str = "BTC_USDT_USDT", start: str | None = None,
 
 class AnalyzeReq(BaseModel):
     pair: str = "BTC_USDT_USDT"
+    strategy: str | None = None   # which strategy's indicator dump to compute on
     op: str                       # "eval" | "cross_recross" | "value_at" | "stat"
     indicator: str | None = None  # column to compare against
     price_field: str = "close"    # which price series: close|low|high|open
@@ -834,7 +889,7 @@ def _corr_scan(df: pd.DataFrame, req: AnalyzeReq) -> dict:
 
 @app.post("/api/analyze")
 def api_analyze(req: AnalyzeReq):
-    df = load_pair(req.pair).copy()
+    df = load_pair(req.pair, req.strategy).copy()
     if req.start:
         df = df[df["date"] >= pd.Timestamp(req.start, tz="UTC")]
     if req.end:
